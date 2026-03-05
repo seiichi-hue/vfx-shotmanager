@@ -803,7 +803,7 @@ let _suppressSave = false; // Firebase受信時に再保存しないフラグ
 
 function saveToFirebase() {
   if (_suppressSave) return;
-  const saveData = data.map(r => { const d = {...r}; delete d.thumb; return d; });
+  const saveData = data.map(r => { const d = {...r}; return d; });
   db.ref('project').set({
     scenes, members, totalN,
     projectName: document.getElementById('project-name').value || '',
@@ -827,10 +827,7 @@ function loadFromFirebase() {
       document.getElementById('project-name').value = val.projectName;
     }
     if (val.data) {
-      // thumbはローカル保持（Firebase外）
-      const localThumbs = {};
-      data.forEach((r,i) => { if(r.thumb) localThumbs[i] = r.thumb; });
-      data = val.data.map((r,i) => ({ ...r, thumb: localThumbs[i] || null }));
+      data = val.data;
     }
     render();
     _suppressSave = false;
@@ -1144,12 +1141,37 @@ function onScene(el) {
   debouncedSave();
 }
 function triggerThumb(i) { document.getElementById('fi-' + i).click(); }
-function onThumb(input, i) {
+async function onThumb(input, i) {
   const file = input.files[0];
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => { data[i].thumb = e.target.result; render(); };
-  reader.readAsDataURL(file);
+
+  // アップロード中表示
+  const wrap = input.closest('.thumb-wrap') || document.querySelector(`#fi-${i}`).parentElement;
+  wrap.innerHTML = `<span class="thumb-plus" style="font-size:10px;color:var(--dim);">アップロード中...</span>`;
+
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', 'vfx_shotmanager');
+    formData.append('cloud_name', 'dbjkiyjma');
+
+    const res = await fetch('https://api.cloudinary.com/v1_1/dbjkiyjma/image/upload', {
+      method: 'POST',
+      body: formData,
+    });
+    const result = await res.json();
+    if (result.secure_url) {
+      data[i].thumb = result.secure_url;
+      debouncedSave();
+      render();
+    } else {
+      alert('アップロード失敗: ' + (result.error?.message || '不明なエラー'));
+      render();
+    }
+  } catch(e) {
+    alert('アップロードエラー: ' + e.message);
+    render();
+  }
 }
 
 /* ── STATS ── */
