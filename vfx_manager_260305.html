@@ -1467,17 +1467,18 @@ function render() {
 
     const rci = sceneColorIdx(row.scene);
     const rp  = SCENE_PALETTE[rci];
-    html += `<tr style="background:${rp.bg};">
-      <td class="td-scene">${sceneSel(i, row.scene)}</td>
-      <td class="td-cut">${cutSel(i, row.scene, row.cut)}</td>
-      <td class="td-thumb">
+    const scBg = `background:${rp.bg};border-left:3px solid ${rp.bd};`;
+    html += `<tr>
+      <td class="td-scene" style="${scBg}">${sceneSel(i, row.scene)}</td>
+      <td class="td-cut" style="${scBg}">${cutSel(i, row.scene, row.cut)}</td>
+      <td class="td-thumb" style="${scBg}">
         <div class="thumb-wrap" onclick="triggerThumb(${i})" title="クリックして画像を追加" style="position:relative;">
           ${thumbHtml}
           ${thumbDelBtn}
         </div>
         <input class="thumb-input" id="fi-${i}" type="file" accept="image/*" onchange="onThumb(this,${i})" />
       </td>
-      <td class="td-cgcontent"><input class="cg-input" type="text" value="${esc(row.cgContent)}" placeholder="CG内容..." data-i="${i}" data-f="cgContent" onchange="onInp(this)" /></td>
+      <td class="td-cgcontent" style="${scBg}"><input class="cg-input" type="text" value="${esc(row.cgContent)}" placeholder="CG内容..." data-i="${i}" data-f="cgContent" onchange="onInp(this)" /></td>
       <td class="td-track">${stSel(i,'tracking',row.tracking)}</td>
       <td class="td-track">${asnInp(i,'trackingAsn',row.trackingAsn, row.tracking==='なし')}</td>
       <td class="td-track">${memoInp(i,'trackingMemo',row.trackingMemo, row.tracking==='なし')}</td>
@@ -1519,8 +1520,19 @@ function onMemo(el) {
 }
 function onScene(el) {
   const i = +el.dataset.i;
-  data[i].scene = el.value;
-  data[i].cut   = cutLabel(el.value, 1);
+  const newScene = el.value;
+  data[i].scene = newScene;
+  // 同シーンで使われているCut番号を収集
+  const usedNums = data
+    .filter((r, ri) => ri !== i && r.scene === newScene)
+    .map(r => {
+      const m = r.cut.match(/-C(\d+)$/);
+      return m ? parseInt(m[1]) : 0;
+    });
+  // 使われていない最小番号を割り当て
+  let n = 1;
+  while (usedNums.includes(n)) n++;
+  data[i].cut = cutLabel(newScene, n);
   render();
   debouncedSave();
 }
