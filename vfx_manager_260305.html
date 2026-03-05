@@ -1176,11 +1176,12 @@ function openProject(id) {
   currentProjectId = id;
   // 状態リセット
   scenes = ['Scene01']; members = ['未割当'];
-  totalN = 0; data = []; ganttBars = {};
+  totalN = 0; data = []; ganttBars = {}; ganttSections = [...DEFAULT_SECTIONS];
   document.getElementById('project-home').style.display = 'none';
   document.getElementById('app').style.visibility = 'visible';
   document.getElementById('app').style.pointerEvents = 'auto';
   loadFromFirebase(id);
+  loadGanttSections(id);
 }
 
 function deleteProject(e, id, name) {
@@ -1598,6 +1599,58 @@ async function onThumb(input, i) {
 
 /* ── STATS ── */
 
+
+/* ── GANTT SECTION MANAGEMENT ── */
+const SECTION_COLORS = ['#5b9cf6','#28c38a','#f0a030','#a96ff4','#f06080','#50c8f0','#c8a050','#a0c850'];
+
+function addGanttSection() {
+  const inp = document.getElementById('new-section-inp');
+  if (!inp) return;
+  const label = inp.value.trim();
+  if (!label) return;
+  const key = 'custom_' + Date.now();
+  const color = SECTION_COLORS[ganttSections.length % SECTION_COLORS.length];
+  ganttSections.push({ key, label, color });
+  inp.value = '';
+  saveGanttSections();
+  renderGantt();
+}
+
+function deleteSection(key) {
+  if (ganttSections.length <= 1) { alert('最低1つの工程が必要です'); return; }
+  if (!confirm('この工程を削除しますか？バーのデータも削除されます。')) return;
+  ganttSections = ganttSections.filter(s => s.key !== key);
+  // 関連バーを削除
+  Object.keys(ganttBars).forEach(k => { if (k === key) delete ganttBars[k]; });
+  saveGanttSections();
+  renderGantt();
+  debouncedSave();
+}
+
+function renameSection(key, newLabel) {
+  if (!newLabel) return;
+  const sec = ganttSections.find(s => s.key === key);
+  if (sec) { sec.label = newLabel; saveGanttSections(); }
+}
+
+function saveGanttSections() {
+  if (currentProjectId) {
+    db.ref('projects/' + currentProjectId + '/ganttSections').set(ganttSections);
+  }
+}
+
+function loadGanttSections(projectId) {
+  db.ref('projects/' + projectId + '/ganttSections').once('value', snap => {
+    const val = snap.val();
+    if (val && Array.isArray(val) && val.length > 0) {
+      ganttSections = val;
+    } else {
+      ganttSections = [...DEFAULT_SECTIONS];
+    }
+    renderGantt();
+  });
+}
+
 /* ── ROW DRAG & DROP ── */
 let _dragSrcRow = null;
 
@@ -1726,8 +1779,15 @@ function signOut() {
 }
 
 document.getElementById('add-btn').addEventListener('click', () => {
+  // 一番下のリストのSceneを使用
+  const lastScene = data.length > 0 ? data[data.length - 1].scene : (scenes[0] || 'Scene01');
+  // 同シーンの最大Cut番号+1
+  const usedNums = data
+    .filter(r => r.scene === lastScene)
+    .map(r => { const m = r.cut.match(/-C(\d+)$/); return m ? parseInt(m[1]) : 0; });
+  const maxN = usedNums.length > 0 ? Math.max(...usedNums) : 0;
   data.push({
-    scene: scenes[0], cut: cutLabel(scenes[0], data.length+1),
+    scene: lastScene, cut: cutLabel(lastScene, maxN + 1),
     thumb: null, cgContent: '',
     tracking:'未着手', trackingAsn:'', trackingMemo:'',
     keying:'未着手',   keyingAsn:'',   keyingMemo:'',
@@ -1758,12 +1818,14 @@ function switchTab(name, btn) {
 }
 
 /* ── GANTT STATE ── */
-const SECTIONS = [
+// デフォルト工程（Firebaseから上書きされる）
+const DEFAULT_SECTIONS = [
   { key: 'tracking', label: 'Tracking',  color: '#5b9cf6' },
   { key: 'keying',   label: 'Keying',    color: '#28c38a' },
   { key: 'cgRender', label: 'CG Render', color: '#f0a030' },
   { key: 'comp',     label: 'Composite', color: '#a96ff4' },
 ];
+let ganttSections = [...DEFAULT_SECTIONS];
 
 let ganttScale = 'day'; // 'day' | 'week'
 let ganttBars  = {};    // key: `rowIdx-sectionKey` => { start, end }
@@ -1866,7 +1928,7 @@ function renderGantt() {
 
   // Build rows: one row per section（工程ごとに1行）
   const rows = [];
-  SECTIONS.forEach(sec => {
+  ganttSections.forEach(sec => {
     rows.push({ section: sec });
   });
 
@@ -1897,12 +1959,19 @@ function renderGantt() {
     const bKey = `${row.section.key}`;
     const bar  = ganttBars[bKey] || null;
 
-    let cells = `<td class="g-label-col">
+    let cells = `<td class="g-label-col" style="position:relative;">
       <div class="g-row-inner">
         <div class="g-section-dot" style="background:${row.section.color}"></div>
-        <div>
-          <div class="g-row-name">${row.section.label}</div>
+        <div style="flex:1;min-width:0;">
+          <div class="g-row-name" contenteditable="true"
+            onblur="renameSection('${row.section.key}',this.textContent.trim())"
+            onclick="event.stopPropagation()"
+            style="outline:none;cursor:text;"
+            title="クリックで名前変更">${row.section.label}</div>
         </div>
+        <button onclick="deleteSection('${row.section.key}')"
+          style="background:none;border:none;color:#3a4060;cursor:pointer;font-size:13px;padding:0 4px;flex-shrink:0;"
+          title="工程を削除" onmouseover="this.style.color='#f06060'" onmouseout="this.style.color='#3a4060'">✕</button>
       </div>
     </td>`;
 
@@ -1971,12 +2040,29 @@ function renderGantt() {
     tbody += `<tr>${cells}</tr>`;
   });
 
+  // 「工程を追加」行
+  const addRow = `<tr>
+    <td class="g-label-col" style="padding:6px 10px;">
+      <div style="display:flex;align-items:center;gap:6px;">
+        <input id="new-section-inp" type="text" placeholder="工程名を入力..."
+          style="background:var(--s2);border:1px solid var(--border);border-radius:6px;
+          padding:4px 8px;font-size:12px;color:var(--text);width:130px;outline:none;"
+          onkeydown="if(event.key==='Enter')addGanttSection()"
+        />
+        <button onclick="addGanttSection()"
+          style="background:var(--green);border:none;border-radius:6px;padding:4px 10px;
+          font-size:12px;color:#0b0e16;font-weight:700;cursor:pointer;">＋ 追加</button>
+      </div>
+    </td>
+    <td colspan="${cols.length}"></td>
+  </tr>`;
+
   const html = `<table class="gantt-table">
     <thead>
       <tr class="g-month-row">${monthThs}</tr>
       <tr class="g-day-row">${dayThs}</tr>
     </thead>
-    <tbody>${tbody}</tbody>
+    <tbody>${tbody}${addRow}</tbody>
   </table>`;
 
   document.getElementById('gantt-grid').innerHTML = html;
