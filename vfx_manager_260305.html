@@ -757,6 +757,9 @@ body {
     Googleでログイン
   </button>
   <div style="font-size:11px;color:#2a3650;">アクセス権限のあるGoogleアカウントでサインインしてください</div>
+  <div id="login-error" style="display:none;font-size:12px;color:#f06060;background:rgba(240,80,80,.1);border:1px solid rgba(240,80,80,.3);border-radius:8px;padding:10px 18px;text-align:center;">
+    @nb-bros.com のアカウントのみアクセスできます
+  </div>
 </div>
 
 
@@ -1508,8 +1511,18 @@ function updateStats() {
 }
 
 /* ── INIT ── */
+const ALLOWED_DOMAIN = 'nb-bros.com';
+
 auth.onAuthStateChanged(user => {
   if (user) {
+    const email = user.email || '';
+    if (!email.endsWith('@' + ALLOWED_DOMAIN)) {
+      auth.signOut();
+      document.getElementById('login-screen').style.display = 'flex';
+      document.getElementById('login-error').style.display = 'block';
+      return;
+    }
+    document.getElementById('login-error').style.display = 'none';
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('user-info').textContent = user.displayName || user.email;
     document.getElementById('ph-user-info').textContent = user.displayName || user.email;
