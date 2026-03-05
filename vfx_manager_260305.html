@@ -1,0 +1,1636 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VFX.ShotManager</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* ===== RESET & BASE ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #0b0e16;
+  --s1:        #111520;
+  --s2:        #171d2e;
+  --s3:        #1e2740;
+  --border:    #263050;
+  --border2:   #2e3a58;
+  --text:      #b8c5df;
+  --dim:       #4e5f7a;
+  --bright:    #e8eefb;
+
+  --blue:      #5b9cf6;
+  --purple:    #28c38a;
+  --amber:     #f0a030;
+  --green:     #a96ff4;
+
+  --blue-bg:   rgba(91,156,246,.10);
+  --purple-bg: rgba(40,195,138,.10);
+  --amber-bg:  rgba(240,160,48,.10);
+  --green-bg:  rgba(169,111,244,.10);
+
+  --blue-bd:   rgba(91,156,246,.30);
+  --purple-bd: rgba(40,195,138,.30);
+  --amber-bd:  rgba(240,160,48,.30);
+  --green-bd:  rgba(169,111,244,.30);
+
+  --header-h:  60px;
+  --bar-h:     42px;
+  --tab-h:     44px;
+}
+
+body {
+  font-family: 'Noto Sans JP', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  min-width: 1260px;
+  overflow-x: auto;
+}
+
+/* ===== HEADER ===== */
+.header {
+  position: sticky; top: 0; z-index: 300;
+  height: var(--header-h);
+  background: var(--s1);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center;
+  padding: 0 24px; gap: 16px;
+  box-shadow: 0 2px 16px rgba(0,0,0,.4);
+}
+
+.logo {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 18px; font-weight: 700;
+  color: var(--bright); letter-spacing: -.3px;
+  flex-shrink: 0;
+}
+.logo span { color: var(--green); }
+
+.logo-wrap {
+  display: flex; flex-direction: column; gap: 2px; flex-shrink: 0;
+}
+
+.project-name-inp {
+  background: transparent; border: none; outline: none;
+  font-family: 'Noto Sans JP', sans-serif;
+  font-size: 13px; font-weight: 500; color: var(--text);
+  width: 220px;
+  transition: all .15s;
+}
+.project-name-inp::placeholder { color: #2a3650; }
+.project-name-inp:focus { color: var(--bright); border-bottom: 1px solid var(--border2); }
+
+.h-sep { width: 1px; height: 20px; background: var(--border2); flex-shrink: 0; }
+
+.project-label { font-size: 12px; color: var(--dim); letter-spacing: .5px; flex-shrink: 0; }
+
+.header-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+
+/* Stat chips */
+.stat-chip {
+  display: flex; flex-direction: column; align-items: center;
+  background: var(--s2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 5px 14px; min-width: 68px;
+}
+.stat-chip .val {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 18px; font-weight: 700; line-height: 1.1;
+  color: var(--bright);
+}
+.stat-chip.wip .val  { color: var(--amber); }
+.stat-chip.done .val { color: var(--green); }
+.stat-chip .lbl { font-size: 9px; color: var(--dim); letter-spacing: .8px; text-transform: uppercase; margin-top: 1px; }
+
+/* Total shots counter */
+.total-chip {
+  display: flex; align-items: center;
+  background: var(--s3); border: 1px solid var(--border2);
+  border-radius: 8px; overflow: hidden;
+}
+.total-center {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 5px 12px;
+}
+.total-center .val {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 18px; font-weight: 700; color: var(--bright); line-height: 1.1;
+  cursor: pointer; min-width: 32px; text-align: center;
+}
+.total-center input {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 18px; font-weight: 700; color: var(--bright);
+  background: transparent; border: none; outline: none;
+  width: 42px; text-align: center; display: none;
+  -moz-appearance: textfield;
+}
+.total-center input::-webkit-inner-spin-button,
+.total-center input::-webkit-outer-spin-button { -webkit-appearance: none; }
+.total-center .lbl { font-size: 9px; color: var(--dim); letter-spacing: .8px; text-transform: uppercase; margin-top: 1px; }
+.total-arrows { display: flex; flex-direction: column; border-left: 1px solid var(--border); }
+.arr-btn {
+  background: transparent; border: none; color: var(--dim);
+  cursor: pointer; font-size: 9px; padding: 5px 9px;
+  transition: all .15s; line-height: 1;
+}
+.arr-btn:first-child { border-bottom: 1px solid var(--border); }
+.arr-btn:hover { background: var(--border2); color: var(--bright); }
+
+/* Scene manager button */
+.scene-mgr-btn {
+  background: var(--s2); border: 1px solid var(--border2);
+  border-radius: 8px; color: var(--text);
+  font-size: 12px; font-family: 'Noto Sans JP', sans-serif;
+  padding: 7px 14px; cursor: pointer; transition: all .15s;
+  white-space: nowrap;
+}
+.scene-mgr-btn:hover { border-color: var(--green); color: var(--green); }
+
+/* ===== PROGRESS BAR STRIP ===== */
+.prog-strip {
+  position: sticky; top: var(--header-h); z-index: 200;
+  background: var(--s1); border-bottom: 1px solid var(--border);
+  height: var(--bar-h);
+  display: flex; align-items: center;
+  padding: 0 24px; gap: 24px;
+}
+.prog-item { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 120px; }
+.prog-name { font-size: 10px; font-weight: 600; letter-spacing: .8px; text-transform: uppercase; white-space: nowrap; width: 64px; }
+.prog-track { color: var(--blue); }
+.prog-key   { color: var(--purple); }
+.prog-cg    { color: var(--amber); }
+.prog-comp  { color: var(--green); }
+.prog-bar-bg { flex: 1; height: 5px; background: var(--s3); border-radius: 99px; overflow: hidden; }
+.prog-bar-fill { height: 100%; border-radius: 99px; width: 0; transition: width .4s ease; }
+.prog-pct { font-family: 'DM Sans', sans-serif; font-size: 11px; font-weight: 600; width: 30px; text-align: right; }
+
+/* ===== SCENE PANEL ===== */
+.scene-panel {
+  margin: 20px 24px;
+  background: var(--s1);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: visible;
+  box-shadow: 0 2px 12px rgba(0,0,0,.25);
+}
+.scene-header {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--s2); border-bottom: 1px solid var(--border);
+  padding: 10px 16px;
+}
+.scene-header-name {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px; font-weight: 700; color: var(--bright);
+}
+.scene-cut-count {
+  font-size: 11px; color: var(--dim);
+  background: var(--s3); border: 1px solid var(--border);
+  border-radius: 99px; padding: 1px 10px;
+}
+
+.scene-project-inp {
+  margin-left: auto;
+  background: transparent; border: none; outline: none;
+  font-family: 'Noto Sans JP', sans-serif;
+  font-size: 13px; font-weight: 500; color: var(--text);
+  width: 220px; text-align: right;
+  transition: all .15s;
+}
+.scene-project-inp::placeholder { color: #2a3650; }
+.scene-project-inp:focus { color: var(--bright); border-bottom: 1px solid var(--border2); }
+
+/* ===== TABLE ===== */
+.shot-table {
+  width: 100%;
+  min-width: 1200px;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+/* sticky header rows */
+.shot-table thead th {
+  position: sticky;
+  z-index: 150;
+  padding: 7px 8px;
+  text-align: center;
+  font-size: 10px; font-weight: 600; letter-spacing: .5px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+/* 1行目：Scene / Cut / キャプチャ / CG内容 + セクション名 */
+.shot-table thead tr:first-child th {
+  top: 148px;
+}
+/* 2行目：進捗 / 担当者 / メモ などサブヘッダー */
+.shot-table thead tr:last-child th {
+  top: 179px;
+}
+
+.th-base    { background: var(--s2); color: var(--dim); }
+.th-track   { background: #1a2d4a; color: var(--blue); }
+.th-key     { background: #152e28; color: var(--purple); }
+.th-cg      { background: #2e2210; color: var(--amber); }
+.th-comp    { background: #221a38; color: var(--green); }
+
+.shot-table tbody tr {
+  border-bottom: 1px solid var(--border);
+  transition: background .1s;
+}
+.shot-table tbody tr:last-child { border-bottom: none; }
+.shot-table tbody tr:hover { background: var(--s2); }
+
+.shot-table td {
+  padding: 10px 8px;
+  vertical-align: top;
+  text-align: center;
+}
+
+/* scene / cut cell */
+.td-scene, .td-cut { width: 110px; }
+
+.cell-sel {
+  width: 100%;
+  background: transparent; border: 1px solid transparent;
+  border-radius: 5px; padding: 4px 6px;
+  font-size: 12px; font-family: 'DM Sans', sans-serif;
+  font-weight: 600; color: var(--bright);
+  cursor: pointer; outline: none; transition: all .15s;
+  text-align: center;
+}
+.cell-sel:hover  { background: var(--s3); border-color: var(--border2); }
+.cell-sel:focus  { background: var(--s3); border-color: var(--blue); }
+
+/* thumbnail cell */
+.td-thumb { width: 100px; }
+
+.thumb-wrap {
+  width: 90px; height: 56px;
+  border: 1px dashed var(--border2);
+  border-radius: 5px; overflow: hidden;
+  cursor: pointer; position: relative;
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto; transition: border-color .15s;
+}
+.thumb-wrap:hover { border-color: var(--blue); }
+.thumb-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.thumb-wrap .thumb-plus {
+  font-size: 18px; color: var(--border2);
+  pointer-events: none; transition: color .15s;
+}
+.thumb-wrap:hover .thumb-plus { color: var(--blue); }
+.thumb-input { display: none; }
+
+/* cg content */
+.td-cgcontent { width: 110px; }
+.cg-input {
+  width: 100%; background: transparent;
+  border: 1px solid transparent; border-radius: 5px;
+  padding: 4px 6px; color: var(--text); font-size: 11px;
+  font-family: 'Noto Sans JP', sans-serif;
+  outline: none; transition: all .15s; text-align: center;
+}
+.cg-input:hover  { border-color: var(--border2); background: var(--s3); }
+.cg-input:focus  { border-color: var(--blue); background: var(--s2); box-shadow: 0 0 0 2px rgba(91,156,246,.12); }
+.cg-input::placeholder { color: var(--border2); }
+
+/* section cells */
+.td-track { background: var(--blue-bg);   border-left: 2px solid var(--blue-bd); }
+.td-key   { background: var(--purple-bg); border-left: 2px solid var(--purple-bd); }
+.td-cg    { background: var(--amber-bg);  border-left: 2px solid var(--amber-bd); }
+.td-comp  { background: var(--green-bg);  border-left: 2px solid var(--green-bd); }
+
+/* status select */
+.status-sel {
+  appearance: none;
+  border: 1px solid transparent; border-radius: 99px;
+  padding: 3px 10px; font-size: 11px;
+  font-family: 'Noto Sans JP', sans-serif; font-weight: 500;
+  cursor: pointer; outline: none; transition: all .15s;
+  min-width: 76px; text-align: center;
+}
+.st-none { background: rgba(255,255,255,.05); color: var(--dim); border-color: var(--border); }
+.st-wip  { background: rgba(240,160,48,.18); color: var(--amber); border-color: rgba(240,160,48,.4); }
+.st-done { background: rgba(40,195,138,.18); color: var(--green); border-color: rgba(40,195,138,.4); }
+.status-sel:hover { filter: brightness(1.15); }
+
+/* assignee select */
+.asn-select {
+  width: 90px; background: transparent;
+  border: 1px solid transparent; border-radius: 5px;
+  padding: 4px 5px; color: var(--text); font-size: 11px;
+  font-family: 'Noto Sans JP', sans-serif;
+  outline: none; transition: all .15s; text-align: center;
+  cursor: pointer;
+}
+.asn-select:hover  { border-color: var(--border2); background: var(--s3); }
+.asn-select:focus  { border-color: var(--purple); background: var(--s2); }
+
+/* memo textarea */
+.memo-input {
+  width: 110px; min-width: 110px;
+  background: transparent;
+  border: 1px solid transparent; border-radius: 5px;
+  padding: 4px 6px; color: var(--text); font-size: 11px;
+  font-family: 'Noto Sans JP', sans-serif;
+  outline: none; transition: all .15s; text-align: left;
+  resize: none; overflow: hidden;
+  line-height: 1.5; min-height: 28px;
+  display: block;
+}
+.memo-input:hover  { border-color: var(--border2); background: var(--s3); }
+.memo-input:focus  { border-color: var(--dim); background: var(--s2); }
+.memo-input::placeholder { color: #2a3650; }
+
+/* ver badge */
+.ver-badge {
+  background: var(--s3); border: 1px solid var(--border);
+  border-radius: 4px; padding: 2px 7px;
+  font-family: 'DM Sans', sans-serif; font-size: 10px; color: var(--dim);
+}
+
+/* ===== ADD ROW BUTTON ===== */
+.add-row-btn {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  width: calc(100% - 48px); margin: 0 24px 24px;
+  background: var(--s1); border: 1.5px dashed var(--border2);
+  color: var(--dim); padding: 8px; border-radius: 9px;
+  font-size: 12px; cursor: pointer; transition: all .2s;
+  font-family: 'Noto Sans JP', sans-serif;
+}
+.add-row-btn:hover { border-color: var(--green); color: var(--green); background: rgba(40,195,138,.06); }
+
+/* ===== SCENE MODAL ===== */
+.modal-backdrop {
+  display: none; position: fixed; inset: 0; z-index: 500;
+  background: rgba(0,0,0,.6); backdrop-filter: blur(4px);
+  align-items: center; justify-content: center;
+}
+.modal-backdrop.open { display: flex; }
+.modal {
+  background: var(--s1); border: 1px solid var(--border2);
+  border-radius: 14px; width: 360px; overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0,0,0,.6);
+}
+.modal-head {
+  padding: 16px 20px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.modal-head h3 { font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 700; color: var(--bright); }
+.modal-close { background: transparent; border: none; color: var(--dim); font-size: 20px; cursor: pointer; line-height: 1; }
+.modal-close:hover { color: var(--bright); }
+.modal-body { padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; }
+.scene-list { display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; }
+.scene-list-item {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--s2); border: 1px solid var(--border);
+  border-radius: 7px; padding: 8px 12px;
+}
+.scene-list-item span { flex: 1; font-size: 13px; color: var(--bright); }
+.scene-del-btn {
+  background: transparent; border: none; color: var(--dim);
+  cursor: pointer; font-size: 14px; padding: 0 4px; line-height: 1;
+}
+.scene-del-btn:hover { color: #f06060; }
+.scene-add-row { display: flex; gap: 8px; }
+.scene-add-input {
+  flex: 1; background: var(--s2); border: 1px solid var(--border2);
+  border-radius: 7px; padding: 8px 12px;
+  color: var(--bright); font-size: 13px;
+  font-family: 'Noto Sans JP', sans-serif; outline: none;
+}
+.scene-add-input:focus { border-color: var(--green); }
+.scene-add-input::placeholder { color: var(--dim); }
+.scene-add-confirm {
+  background: var(--green); border: none; border-radius: 7px;
+  color: #fff; font-size: 13px; font-weight: 700;
+  padding: 8px 14px; cursor: pointer; white-space: nowrap;
+}
+.scene-add-confirm:hover { filter: brightness(1.1); }
+
+/* ===== SCROLLBAR ===== */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 99px; }
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.scene-panel { /* animation removed to preserve sticky */ }
+.shot-table-scroll {
+  /* overflow managed by body */
+}
+
+/* ===== TABS ===== */
+.tab-bar {
+  position: sticky;
+  top: calc(var(--header-h) + var(--bar-h));
+  z-index: 150;
+  display: flex; align-items: flex-end; gap: 2px;
+  padding: 0 24px;
+  background: var(--bg);
+  border-bottom: 2px solid var(--border);
+}
+.tab-btn {
+  background: transparent;
+  border: 1px solid transparent; border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  padding: 10px 24px;
+  font-size: 13px; font-weight: 600;
+  font-family: 'Noto Sans JP', sans-serif;
+  color: var(--dim); cursor: pointer; transition: all .15s;
+  position: relative; top: 2px;
+}
+.tab-btn:hover { color: var(--text); background: var(--s2); }
+.tab-btn.active {
+  background: var(--s1);
+  border-color: var(--border);
+  color: var(--bright);
+}
+.tab-btn.active::after {
+  content: '';
+  position: absolute; bottom: -2px; left: 0; right: 0;
+  height: 2px; background: var(--s1);
+}
+.tab-page { display: none; }
+.tab-page.active { display: block; }
+
+/* ===== GANTT ===== */
+.gantt-wrap {
+  margin: 20px 24px;
+  background: var(--s1); border: 1px solid var(--border);
+  border-radius: 12px; overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0,0,0,.25);
+  animation: fadeUp .3s ease both;
+}
+.gantt-toolbar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 16px; background: var(--s2);
+  border-bottom: 1px solid var(--border); flex-wrap: wrap;
+}
+.gantt-toolbar label { font-size: 11px; color: var(--dim); }
+.gantt-date-inp {
+  background: var(--s3); border: 1px solid var(--border2);
+  border-radius: 6px; padding: 5px 10px;
+  color: var(--bright); font-size: 12px;
+  font-family: 'Noto Sans JP', sans-serif; outline: none;
+}
+.gantt-date-inp:focus { border-color: var(--blue); }
+.gantt-scale-btn {
+  background: var(--s3); border: 1px solid var(--border2);
+  border-radius: 6px; padding: 5px 12px;
+  color: var(--text); font-size: 12px;
+  font-family: 'Noto Sans JP', sans-serif; cursor: pointer; transition: all .15s;
+}
+.gantt-scale-btn:hover,.gantt-scale-btn.active { border-color: var(--blue); color: var(--blue); background: var(--blue-bg); }
+.gantt-today-btn {
+  background: rgba(59,130,246,.15); border: 1px solid rgba(59,130,246,.4);
+  border-radius: 6px; padding: 5px 12px;
+  color: #93c5fd; font-size: 12px;
+  font-family: 'Noto Sans JP', sans-serif; cursor: pointer; transition: all .15s;
+  margin-left: auto;
+}
+.gantt-today-btn:hover { filter: brightness(1.15); }
+.gantt-grid {
+  overflow-x: auto; overflow-y: auto;
+  max-height: calc(100vh - 300px);
+  position: relative;
+}
+.gantt-table {
+  border-collapse: collapse; min-width: 100%; font-size: 12px;
+  table-layout: fixed;
+}
+.gantt-table .g-label-col {
+  width: 180px; min-width: 180px;
+  background: var(--s2);
+  position: sticky; left: 0; z-index: 20;
+  border-right: 2px solid var(--border);
+}
+.gantt-table thead th {
+  padding: 6px 0; text-align: center;
+  font-size: 10px; font-weight: 600; color: var(--dim);
+  background: var(--s2); border-bottom: 1px solid var(--border);
+  white-space: nowrap; position: sticky; top: 0; z-index: 15;
+}
+.gantt-table thead th.g-label-col {
+  z-index: 25; text-align: left; padding-left: 14px;
+  font-size: 11px; color: var(--text);
+}
+.gantt-table thead tr.g-month-row th {
+  background: var(--s3); font-size: 9px; letter-spacing: .6px;
+  text-transform: uppercase; padding: 4px 0;
+  position: sticky; top: 0; z-index: 14;
+  border-bottom: 1px solid var(--border);
+}
+.gantt-table thead tr.g-day-row th {
+  position: sticky; top: 25px; z-index: 14; background: var(--s2);
+}
+.gantt-table tbody tr { border-bottom: 1px solid rgba(38,48,80,.5); }
+.gantt-table tbody tr:hover .g-label-col { background: var(--s3); }
+.g-label-col .g-row-inner {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 10px 9px 14px;
+}
+.g-section-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.g-row-name { font-size: 12px; color: var(--text); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.g-row-sub  { font-size: 10px; color: var(--dim); }
+.g-cell {
+  width: 30px; min-width: 30px; height: 40px;
+  border-right: 1px solid rgba(38,48,80,.35);
+  position: relative; vertical-align: middle;
+}
+.g-cell.today-col { background: rgba(91,156,246,.07); }
+.g-cell.weekend   { background: rgba(255,255,255,.015); }
+.g-bar-td { position: relative; overflow: visible; }
+.g-bar {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  height: 20px; border-radius: 5px; cursor: grab;
+  transition: filter .15s, height .15s;
+  display: flex; align-items: center; padding: 0 7px;
+  font-size: 10px; font-weight: 600; color: rgba(255,255,255,.9);
+  white-space: nowrap; overflow: hidden; z-index: 5;
+  box-shadow: 0 2px 6px rgba(0,0,0,.35);
+  user-select: none;
+}
+.g-bar:hover { height: 24px; filter: brightness(1.15); z-index: 6; }
+.g-handle {
+  position: absolute; top: 0; bottom: 0; width: 6px;
+  cursor: ew-resize; background: rgba(255,255,255,.2);
+}
+.g-handle-l { left: 0; border-radius: 5px 0 0 5px; }
+.g-handle-r { right: 0; border-radius: 0 5px 5px 0; }
+.today-line {
+  position: absolute; top: 0; bottom: 0; width: 2px;
+  background: var(--blue); opacity: .7; z-index: 10; pointer-events: none;
+}
+.gantt-legend {
+  display: flex; align-items: center; gap: 16px;
+  padding: 9px 16px; border-top: 1px solid var(--border);
+  background: var(--s2); flex-wrap: wrap;
+}
+.g-legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--dim); }
+.g-legend-dot  { width: 10px; height: 10px; border-radius: 3px; }
+.g-tooltip {
+  position: fixed; z-index: 9999;
+  background: var(--s3); border: 1px solid var(--border2);
+  border-radius: 8px; padding: 9px 13px;
+  font-size: 11px; color: var(--text);
+  box-shadow: 0 8px 24px rgba(0,0,0,.5);
+  pointer-events: none; display: none; max-width: 220px; line-height: 1.6;
+}
+.g-tooltip strong { color: var(--bright); display: block; margin-bottom: 3px; font-size: 12px; }
+.bar-modal-backdrop {
+  display: none; position: fixed; inset: 0; z-index: 500;
+  background: rgba(0,0,0,.6); backdrop-filter: blur(4px);
+  align-items: center; justify-content: center;
+}
+.bar-modal-backdrop.open { display: flex; }
+.bar-modal {
+  background: var(--s1); border: 1px solid var(--border2);
+  border-radius: 14px; width: 340px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.6); overflow: hidden;
+}
+.bar-modal-head {
+  padding: 14px 18px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.bar-modal-head h3 { font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 700; color: var(--bright); }
+.bar-modal-body { padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; }
+.bar-field label { display: block; font-size: 10px; color: var(--dim); letter-spacing: .5px; text-transform: uppercase; margin-bottom: 4px; }
+.bar-field input[type=date], .bar-field input[type=text] {
+  width: 100%; background: var(--s2); border: 1px solid var(--border2);
+  border-radius: 7px; padding: 8px 10px; color: var(--bright);
+  font-size: 13px; font-family: 'Noto Sans JP', sans-serif; outline: none;
+}
+.bar-field input:focus { border-color: var(--blue); }
+.bar-modal-actions { display: flex; gap: 8px; padding: 0 18px 16px; }
+.bar-save-btn {
+  flex: 1; background: var(--blue); border: none; border-radius: 7px;
+  color: #fff; font-size: 13px; font-weight: 700; padding: 9px; cursor: pointer;
+}
+.bar-save-btn:hover { filter: brightness(1.1); }
+.bar-cancel-btn {
+  flex: 1; background: var(--s2); border: 1px solid var(--border2);
+  border-radius: 7px; color: var(--text); font-size: 13px; padding: 9px; cursor: pointer;
+}
+
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="logo-wrap">
+    <div class="logo">VFX<span>.</span>ShotManager</div>
+    <input id="project-name" type="hidden" value="" />
+  </div>
+  <div class="h-sep"></div>
+  <div class="project-label">Ver 1.01</div>
+  <div id="sync-status" style="font-size:11px;color:var(--dim);margin-left:4px;white-space:nowrap;">● 接続中...</div>
+
+  <div class="header-right">
+    <button class="scene-mgr-btn" onclick="openModal()">＋ Scene 管理</button>
+    <button class="scene-mgr-btn" onclick="openMemberModal()" style="">＋ 担当者管理</button>
+
+    <div class="total-chip">
+      <div class="total-center">
+        <div class="val" id="total-disp" onclick="startEdit()" title="クリックで直接入力">10</div>
+        <input id="total-inp" type="number" min="1" max="999" value="10"
+          onblur="endEdit()" onkeydown="if(event.key==='Enter')endEdit()" />
+        <div class="lbl">Total Shots</div>
+      </div>
+      <div class="total-arrows">
+        <button class="arr-btn" onclick="adjustTotal(1)">▲</button>
+        <button class="arr-btn" onclick="adjustTotal(-1)">▼</button>
+      </div>
+    </div>
+
+    <div class="stat-chip wip">
+      <div class="val" id="stat-wip">0</div>
+      <div class="lbl">作業中</div>
+    </div>
+    <div class="stat-chip done">
+      <div class="val" id="stat-done">0</div>
+      <div class="lbl">完了</div>
+    </div>
+  </div>
+</div>
+
+<!-- PROGRESS STRIP -->
+<div class="prog-strip">
+  <div class="prog-item">
+    <span class="prog-name prog-track">Tracking</span>
+    <div class="prog-bar-bg"><div class="prog-bar-fill" id="pb-track" style="background:var(--blue)"></div></div>
+    <span class="prog-pct prog-track" id="pp-track">0%</span>
+  </div>
+  <div class="prog-item">
+    <span class="prog-name prog-key">Keying</span>
+    <div class="prog-bar-bg"><div class="prog-bar-fill" id="pb-key" style="background:var(--purple)"></div></div>
+    <span class="prog-pct prog-key" id="pp-key">0%</span>
+  </div>
+  <div class="prog-item">
+    <span class="prog-name prog-cg">CG Render</span>
+    <div class="prog-bar-bg"><div class="prog-bar-fill" id="pb-cg" style="background:var(--amber)"></div></div>
+    <span class="prog-pct prog-cg" id="pp-cg">0%</span>
+  </div>
+  <div class="prog-item">
+    <span class="prog-name prog-comp">Composite</span>
+    <div class="prog-bar-bg"><div class="prog-bar-fill" id="pb-comp" style="background:var(--green)"></div></div>
+    <span class="prog-pct prog-comp" id="pp-comp">0%</span>
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('shots',this)">📋 ショット管理</button>
+  <button class="tab-btn" onclick="switchTab('gantt',this)">📅 スケジュール</button>
+</div>
+
+<!-- TAB: SHOTS -->
+<div class="tab-page active" id="tab-shots">
+  <div id="app"></div>
+  <button class="add-row-btn" id="add-btn">＋ カットを追加</button>
+</div>
+
+<!-- TAB: GANTT -->
+<div class="tab-page" id="tab-gantt">
+  <div class="gantt-wrap">
+    <div class="gantt-toolbar">
+      <label>開始日</label>
+      <input class="gantt-date-inp" type="date" id="g-start" />
+      <label>終了日</label>
+      <input class="gantt-date-inp" type="date" id="g-end" />
+      <div style="display:flex;gap:4px;">
+        <button class="gantt-scale-btn active" id="scale-day" onclick="setScale('day',this)">日</button>
+        <button class="gantt-scale-btn" id="scale-week" onclick="setScale('week',this)">週</button>
+      </div>
+      <button class="gantt-today-btn" onclick="scrollToToday()">今日</button>
+    </div>
+    <div class="gantt-grid" id="gantt-grid"></div>
+    <div class="gantt-legend">
+      <span style="font-size:11px;color:var(--dim);margin-right:4px;">凡例</span>
+      <div class="g-legend-item"><div class="g-legend-dot" style="background:var(--blue)"></div>Tracking</div>
+      <div class="g-legend-item"><div class="g-legend-dot" style="background:var(--purple)"></div>Keying</div>
+      <div class="g-legend-item"><div class="g-legend-dot" style="background:var(--amber)"></div>CG Render</div>
+      <div class="g-legend-item"><div class="g-legend-dot" style="background:var(--green)"></div>Composite</div>
+      <div class="g-legend-item" style="margin-left:auto;"><div style="width:10px;height:10px;background:#60a5fa;opacity:.8;border-radius:2px;"></div>今日</div>
+    </div>
+  </div>
+</div>
+
+<!-- TOOLTIP -->
+<div class="g-tooltip" id="g-tooltip"></div>
+
+<!-- BAR EDIT MODAL -->
+<div class="bar-modal-backdrop" id="bar-modal">
+  <div class="bar-modal">
+    <div class="bar-modal-head">
+      <h3 id="bar-modal-title">スケジュール編集</h3>
+      <button class="modal-close" onclick="closeBarModal()">×</button>
+    </div>
+    <div class="bar-modal-body">
+      <div class="bar-field">
+        <label>開始日</label>
+        <input type="date" id="bar-start-inp" />
+      </div>
+      <div class="bar-field">
+        <label>終了日</label>
+        <input type="date" id="bar-end-inp" />
+      </div>
+    </div>
+    <div class="bar-modal-actions">
+      <button class="bar-cancel-btn" onclick="closeBarModal()">キャンセル</button>
+      <button class="bar-save-btn" onclick="saveBar()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- SCENE MODAL -->
+<div class="modal-backdrop" id="modal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Scene 管理</h3>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="scene-list" id="scene-list"></div>
+      <div class="scene-add-row">
+        <input class="scene-add-input" id="scene-inp" type="text" placeholder="例: Scene02"
+          onkeydown="if(event.key==='Enter')addScene()" />
+        <button class="scene-add-confirm" onclick="addScene()">追加</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MEMBER MODAL -->
+<div class="modal-backdrop" id="member-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>担当者管理</h3>
+      <button class="modal-close" onclick="closeMemberModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="scene-list" id="member-list"></div>
+      <div class="scene-add-row">
+        <input class="scene-add-input" id="member-inp" type="text" placeholder="例: 山田 太郎"
+          onkeydown="if(event.key==='Enter')addMember()" />
+        <button class="scene-add-confirm" style="background:var(--purple)" onclick="addMember()">追加</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script>
+/* ── FIREBASE ── */
+const firebaseConfig = {
+  apiKey: "AIzaSyAd-_1Gq5mZBYjpaSvgpbi3JvdtXm32JBQ",
+  authDomain: "vfx-shotmanager.firebaseapp.com",
+  databaseURL: "https://vfx-shotmanager-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "vfx-shotmanager",
+  storageBucket: "vfx-shotmanager.firebasestorage.app",
+  messagingSenderId: "345115050901",
+  appId: "1:345115050901:web:5e60cab3adaad63a312c9c"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+
+let _suppressSave = false; // Firebase受信時に再保存しないフラグ
+
+function saveToFirebase() {
+  if (_suppressSave) return;
+  const saveData = data.map(r => { const d = {...r}; delete d.thumb; return d; });
+  db.ref('project').set({
+    scenes, members, totalN,
+    projectName: document.getElementById('project-name').value || '',
+    ganttBars,
+    data: saveData,
+  });
+}
+
+function loadFromFirebase() {
+  db.ref('project').on('value', (snapshot) => {
+    const val = snapshot.val();
+    if (!val) return;
+    _suppressSave = true;
+    if (val.scenes)  { scenes  = val.scenes;  }
+    if (val.members) { members = val.members; }
+    if (val.totalN)  { totalN  = val.totalN;
+      document.getElementById('total-disp').textContent = totalN;
+    }
+    if (val.ganttBars) { ganttBars = val.ganttBars; }
+    if (val.projectName !== undefined) {
+      document.getElementById('project-name').value = val.projectName;
+    }
+    if (val.data) {
+      // thumbはローカル保持（Firebase外）
+      const localThumbs = {};
+      data.forEach((r,i) => { if(r.thumb) localThumbs[i] = r.thumb; });
+      data = val.data.map((r,i) => ({ ...r, thumb: localThumbs[i] || null }));
+    }
+    render();
+    _suppressSave = false;
+    setSyncStatus('saved');
+  }, (error) => {
+    console.error('Firebase error:', error);
+    setSyncStatus('error');
+  });
+}
+
+// 同期ステータス表示
+function setSyncStatus(status) {
+  const el = document.getElementById('sync-status');
+  if (!el) return;
+  if (status === 'saving') {
+    el.textContent = '● 保存中...'; el.style.color = '#f0a030';
+  } else if (status === 'saved') {
+    el.textContent = '● 同期済み'; el.style.color = '#28c38a';
+  } else if (status === 'error') {
+    el.textContent = '● エラー';   el.style.color = '#f06060';
+  }
+}
+
+let _saveTimer = null;
+function debouncedSave() {
+  setSyncStatus('saving');
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => {
+    try { saveToFirebase(); setSyncStatus('saved'); }
+    catch(e) { setSyncStatus('error'); }
+  }, 800);
+}
+
+/* ── STATE ── */
+let scenes  = ['Scene01'];
+let members = ['未割当'];
+let totalN  = 10;
+let data    = buildRows(10);
+
+function buildRows(n) {
+  return Array.from({length: n}, (_, i) => ({
+    scene: scenes[0] || 'Scene01',
+    cut:   cutLabel(scenes[0] || 'Scene01', i + 1),
+    thumb: null,
+    cgContent: '',
+    tracking: '未着手', trackingAsn: '', trackingMemo: '',
+    keying:   '未着手', keyingAsn:   '', keyingMemo:   '',
+    keyingFix:'未着手',
+    cgRender: '未着手', cgMemo:      '',
+    comp:     '未着手', compAsn:     '', compMemo:     '',
+  }));
+}
+
+function cutLabel(scene, n) {
+  return scene + '-C' + String(n).padStart(2, '0');
+}
+
+/* ── TOTAL SHOTS ── */
+function adjustTotal(d) { applyTotal(totalN + d); }
+
+function startEdit() {
+  document.getElementById('total-disp').style.display = 'none';
+  const inp = document.getElementById('total-inp');
+  inp.style.display = 'block'; inp.value = totalN;
+  inp.focus(); inp.select();
+}
+function endEdit() {
+  const inp = document.getElementById('total-inp');
+  inp.style.display = 'none';
+  document.getElementById('total-disp').style.display = 'block';
+  let n = parseInt(inp.value);
+  if (isNaN(n) || n < 1) n = 1;
+  if (n > 999) n = 999;
+  applyTotal(n);
+}
+function applyTotal(n) {
+  if (n < 1) n = 1; if (n > 999) n = 999;
+  totalN = n;
+  document.getElementById('total-disp').textContent = n;
+  document.getElementById('total-inp').value = n;
+  while (data.length < n) {
+    const idx = data.length + 1;
+    data.push({
+      scene: scenes[0] || 'Scene01',
+      cut:   cutLabel(scenes[0] || 'Scene01', idx),
+      thumb: null, cgContent: '',
+      tracking: '未着手', trackingAsn: '', trackingMemo: '',
+      keying:   '未着手', keyingAsn:   '', keyingMemo:   '',
+      keyingFix:'未着手',
+      cgRender: '未着手', cgMemo: '',
+      comp:     '未着手', compAsn: '', compMemo: '',
+    });
+  }
+  if (data.length > n) data = data.slice(0, n);
+  render();
+  debouncedSave();
+}
+
+/* ── SCENE MODAL ── */
+function openModal() {
+  renderSceneList();
+  document.getElementById('modal').classList.add('open');
+}
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+  render();
+}
+function renderSceneList() {
+  const list = document.getElementById('scene-list');
+  list.innerHTML = scenes.map((s, i) => `
+    <div class="scene-list-item">
+      <span>${s}</span>
+      <button class="scene-del-btn" onclick="deleteScene(${i})">✕</button>
+    </div>
+  `).join('');
+}
+function addScene() {
+  const inp = document.getElementById('scene-inp');
+  const name = inp.value.trim();
+  if (!name || scenes.includes(name)) return;
+  scenes.push(name);
+  inp.value = '';
+  renderSceneList();
+  debouncedSave();
+}
+function deleteScene(i) {
+  if (scenes.length <= 1) return; // keep at least one
+  scenes.splice(i, 1);
+  // fix rows that referenced deleted scene
+  data.forEach(row => {
+    if (!scenes.includes(row.scene)) {
+      row.scene = scenes[0];
+      row.cut   = cutLabel(scenes[0], 1);
+    }
+  });
+  renderSceneList();
+}
+
+/* ── MEMBER MODAL ── */
+function openMemberModal() {
+  renderMemberList();
+  document.getElementById('member-modal').classList.add('open');
+}
+function closeMemberModal() {
+  document.getElementById('member-modal').classList.remove('open');
+  render();
+}
+function renderMemberList() {
+  const list = document.getElementById('member-list');
+  list.innerHTML = members.map((m, i) => `
+    <div class="scene-list-item">
+      <span>${m}</span>
+      ${i === 0 ? '' : `<button class="scene-del-btn" onclick="deleteMember(${i})">✕</button>`}
+    </div>
+  `).join('');
+}
+function addMember() {
+  const inp = document.getElementById('member-inp');
+  const name = inp.value.trim();
+  if (!name || members.includes(name)) return;
+  members.push(name);
+  inp.value = '';
+  renderMemberList();
+  debouncedSave();
+}
+function deleteMember(i) {
+  members.splice(i, 1);
+  // reset rows that had this member
+  data.forEach(row => {
+    ['trackingAsn','keyingAsn','compAsn'].forEach(f => {
+      if (!members.includes(row[f])) row[f] = members[0];
+    });
+  });
+  renderMemberList();
+  debouncedSave();
+}
+
+/* ── HELPERS ── */
+function stClass(v) {
+  return v === '作業中' ? 'st-wip' : v === '完了' ? 'st-done' : 'st-none';
+}
+function stSel(i, f, v) {
+  return `<select class="status-sel ${stClass(v)}" data-i="${i}" data-f="${f}" onchange="onStatus(this)">
+    <option value="未着手" ${v==='未着手'?'selected':''}>未着手</option>
+    <option value="作業中" ${v==='作業中'?'selected':''}>作業中</option>
+    <option value="完了"   ${v==='完了'  ?'selected':''}>完了</option>
+  </select>`;
+}
+function asnInp(i, f, v) {
+  const opts = members.map(m => `<option value="${esc(m)}" ${v===m?'selected':''}>${esc(m)}</option>`).join('');
+  return `<select class="asn-select" data-i="${i}" data-f="${f}" onchange="onInp(this)">${opts}</select>`;
+}
+function memoInp(i, f, v) {
+  return `<textarea class="memo-input" data-i="${i}" data-f="${f}"
+    placeholder="メモ..." oninput="onMemo(this)" rows="1">${esc(v)}</textarea>`;
+}
+function esc(s) { return s.replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
+function sceneSel(i, v) {
+  const opts = scenes.map(s => `<option value="${s}" ${v===s?'selected':''}>${s}</option>`).join('');
+  return `<select class="cell-sel" data-i="${i}" data-f="scene" onchange="onScene(this)">${opts}</select>`;
+}
+function cutSel(i, scene, v) {
+  const opts = Array.from({length:20},(_,k)=>{
+    const c = cutLabel(scene, k+1);
+    return `<option value="${c}" ${v===c?'selected':''}>${c}</option>`;
+  }).join('');
+  return `<select class="cell-sel" data-i="${i}" data-f="cut" onchange="onInp(this)">${opts}</select>`;
+}
+
+/* ── RENDER ── */
+function render() {
+  const projName = document.getElementById('project-name') ? document.getElementById('project-name').value : '';
+  let html = `<div class="scene-panel">
+    <div class="scene-header">
+      <span class="scene-header-name">Shot List</span>
+      <span class="scene-cut-count">${data.length} カット</span>
+      <input class="scene-project-inp" type="text" placeholder="Project Name..."
+        value="${projName.replace(/"/g,'&quot;')}"
+      oninput="document.getElementById('project-name').value=this.value; debouncedSave()" />
+    </div>
+    <div class="shot-table-scroll">
+    <table class="shot-table">
+      <thead>
+        <tr>
+          <th class="th-base" rowspan="2">Scene</th>
+          <th class="th-base" rowspan="2">Cut</th>
+          <th class="th-base" rowspan="2">キャプチャ</th>
+          <th class="th-base" rowspan="2">CG内容</th>
+          <th class="th-track" colspan="3">Tracking</th>
+          <th class="th-key"   colspan="4">Keying</th>
+          <th class="th-cg"   colspan="2">CG Render</th>
+          <th class="th-comp" colspan="3">Composite</th>
+        </tr>
+        <tr>
+          <th class="th-track">進捗</th>
+          <th class="th-track">担当者</th>
+          <th class="th-track">メモ</th>
+          <th class="th-key">進捗</th>
+          <th class="th-key">担当者</th>
+          <th class="th-key">修正</th>
+          <th class="th-key">メモ</th>
+          <th class="th-cg">進捗</th>
+          <th class="th-cg">メモ</th>
+          <th class="th-comp">進捗</th>
+          <th class="th-comp">担当者</th>
+          <th class="th-comp">メモ</th>
+        </tr>
+      </thead>
+      <tbody>`;
+
+  data.forEach((row, i) => {
+    const thumbHtml = row.thumb
+      ? `<img src="${row.thumb}" alt="cap" />`
+      : `<span class="thumb-plus">＋</span>`;
+
+    html += `<tr>
+      <td class="td-scene">${sceneSel(i, row.scene)}</td>
+      <td class="td-cut">${cutSel(i, row.scene, row.cut)}</td>
+      <td class="td-thumb">
+        <div class="thumb-wrap" onclick="triggerThumb(${i})" title="クリックして画像を追加">
+          ${thumbHtml}
+        </div>
+        <input class="thumb-input" id="fi-${i}" type="file" accept="image/*" onchange="onThumb(this,${i})" />
+      </td>
+      <td class="td-cgcontent"><input class="cg-input" type="text" value="${esc(row.cgContent)}" placeholder="CG内容..." data-i="${i}" data-f="cgContent" onchange="onInp(this)" /></td>
+      <td class="td-track">${stSel(i,'tracking',row.tracking)}</td>
+      <td class="td-track">${asnInp(i,'trackingAsn',row.trackingAsn)}</td>
+      <td class="td-track">${memoInp(i,'trackingMemo',row.trackingMemo)}</td>
+      <td class="td-key">${stSel(i,'keying',row.keying)}</td>
+      <td class="td-key">${asnInp(i,'keyingAsn',row.keyingAsn)}</td>
+      <td class="td-key">${stSel(i,'keyingFix',row.keyingFix)}</td>
+      <td class="td-key">${memoInp(i,'keyingMemo',row.keyingMemo)}</td>
+      <td class="td-cg">${stSel(i,'cgRender',row.cgRender)}</td>
+      <td class="td-cg">${memoInp(i,'cgMemo',row.cgMemo)}</td>
+      <td class="td-comp">${stSel(i,'comp',row.comp)}</td>
+      <td class="td-comp">${asnInp(i,'compAsn',row.compAsn)}</td>
+      <td class="td-comp">${memoInp(i,'compMemo',row.compMemo)}</td>
+    </tr>`;
+  });
+
+  html += `</tbody></table></div></div>`;
+  document.getElementById('app').innerHTML = html;
+  // auto-resize all textareas after render
+  document.querySelectorAll('.memo-input').forEach(ta => {
+    ta.style.height = 'auto';
+    ta.style.height = ta.scrollHeight + 'px';
+  });
+  updateStats();
+}
+
+/* ── EVENT HANDLERS ── */
+function onStatus(el) {
+  data[+el.dataset.i][el.dataset.f] = el.value;
+  el.className = `status-sel ${stClass(el.value)}`;
+  updateStats();
+  debouncedSave();
+}
+function onInp(el) { data[+el.dataset.i][el.dataset.f] = el.value; debouncedSave(); }
+function onMemo(el) {
+  data[+el.dataset.i][el.dataset.f] = el.value;
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + 'px';
+  debouncedSave();
+}
+function onScene(el) {
+  const i = +el.dataset.i;
+  data[i].scene = el.value;
+  data[i].cut   = cutLabel(el.value, 1);
+  render();
+  debouncedSave();
+}
+function triggerThumb(i) { document.getElementById('fi-' + i).click(); }
+function onThumb(input, i) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => { data[i].thumb = e.target.result; render(); };
+  reader.readAsDataURL(file);
+}
+
+/* ── STATS ── */
+function pct(done, total) { return total > 0 ? Math.round(done/total*100) : 0; }
+function setBar(id, p, color) {
+  document.getElementById('pb-'+id).style.width = p + '%';
+  document.getElementById('pp-'+id).textContent = p + '%';
+}
+function updateStats() {
+  const n = data.length;
+  if (!n) return;
+
+  const tDone  = data.filter(r=>r.tracking==='完了').length;
+  const kDone  = data.filter(r=>r.keying==='完了').length + data.filter(r=>r.keyingFix==='完了').length;
+  const cgDone = data.filter(r=>r.cgRender==='完了').length;
+  const cDone  = data.filter(r=>r.comp==='完了').length;
+
+  setBar('track', pct(tDone, n));
+  setBar('key',   pct(kDone, n*2));
+  setBar('cg',    pct(cgDone, n));
+  setBar('comp',  pct(cDone, n));
+
+  const fields = ['tracking','keying','keyingFix','cgRender','comp'];
+  let done=0, wip=0;
+  data.forEach(r => fields.forEach(f => {
+    if(r[f]==='完了') done++;
+    if(r[f]==='作業中') wip++;
+  }));
+  document.getElementById('stat-done').textContent = done;
+  document.getElementById('stat-wip').textContent  = wip;
+}
+
+/* ── INIT ── */
+loadFromFirebase(); // Firebaseからデータ読み込み（初回render含む）
+
+document.getElementById('add-btn').addEventListener('click', () => {
+  data.push({
+    scene: scenes[0], cut: cutLabel(scenes[0], data.length+1),
+    thumb: null, cgContent: '',
+    tracking:'未着手', trackingAsn:'', trackingMemo:'',
+    keying:'未着手',   keyingAsn:'',   keyingMemo:'',
+    keyingFix:'未着手',
+    cgRender:'未着手', cgMemo:'',
+    comp:'未着手', compAsn:'', compMemo:'',
+  });
+  totalN = data.length;
+  document.getElementById('total-disp').textContent = totalN;
+  render();
+  debouncedSave();
+});
+
+document.getElementById('modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal')) closeModal();
+});
+document.getElementById('member-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('member-modal')) closeMemberModal();
+});
+
+/* ── TAB SWITCH ── */
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-page').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+  if (name === 'gantt') renderGantt();
+}
+
+/* ── GANTT STATE ── */
+const SECTIONS = [
+  { key: 'tracking', label: 'Tracking',  color: '#5b9cf6' },
+  { key: 'keying',   label: 'Keying',    color: '#28c38a' },
+  { key: 'cgRender', label: 'CG Render', color: '#f0a030' },
+  { key: 'comp',     label: 'Composite', color: '#a96ff4' },
+];
+
+let ganttScale = 'day'; // 'day' | 'week'
+let ganttBars  = {};    // key: `rowIdx-sectionKey` => { start, end }
+let editingBar = null;
+
+function initGanttDates() {
+  const today = new Date();
+  const start = new Date(today); start.setDate(1);
+  const end   = new Date(today); end.setMonth(end.getMonth() + 2); end.setDate(0);
+  document.getElementById('g-start').value = fmtDate(start);
+  document.getElementById('g-end').value   = fmtDate(end);
+}
+
+function fmtDate(d) {
+  // toISOStringはUTC変換されるためローカル日付で生成
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+function parseDate(s) { return new Date(s + 'T00:00:00'); }
+function diffDays(a, b) { return Math.round((b - a) / 86400000); }
+function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
+
+/* ── 祝日・営業日 ── */
+// 日本の祝日（固定分 + 移動祝日の主要年）
+const JP_HOLIDAYS = new Set([
+  // 2024
+  '2024-01-01','2024-01-08','2024-02-11','2024-02-12','2024-02-23',
+  '2024-03-20','2024-04-29','2024-05-03','2024-05-04','2024-05-05','2024-05-06',
+  '2024-07-15','2024-08-11','2024-08-12','2024-09-16','2024-09-22','2024-09-23',
+  '2024-10-14','2024-11-03','2024-11-04','2024-11-23','2024-12-31',
+  // 2025
+  '2025-01-01','2025-01-13','2025-02-11','2025-02-23','2025-02-24',
+  '2025-03-20','2025-04-29','2025-05-03','2025-05-04','2025-05-05','2025-05-06',
+  '2025-07-21','2025-08-11','2025-09-15','2025-09-23','2025-10-13',
+  '2025-11-03','2025-11-23','2025-11-24',
+  // 2026
+  '2026-01-01','2026-01-12','2026-02-11','2026-02-23','2026-03-20',
+  '2026-04-29','2026-05-03','2026-05-04','2026-05-05','2026-05-06',
+  '2026-07-20','2026-08-11','2026-09-21','2026-09-22','2026-09-23',
+  '2026-10-12','2026-11-03','2026-11-23',
+]);
+
+function isHoliday(d) {
+  const dow = d.getDay();
+  if (dow === 0 || dow === 6) return true; // 土日
+  return JP_HOLIDAYS.has(fmtDate(d));
+}
+
+// 2日間の間の営業日数（土日祝を除く）
+function workDays(startDate, endDate) {
+  let count = 0;
+  const d = new Date(startDate);
+  while (d <= endDate) {
+    if (!isHoliday(d)) count++;
+    d.setDate(d.getDate() + 1);
+  }
+  return count;
+}
+
+function setScale(s, btn) {
+  ganttScale = s;
+  document.querySelectorAll('.gantt-scale-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderGantt();
+}
+
+function renderGantt() {
+  const startStr = document.getElementById('g-start').value;
+  const endStr   = document.getElementById('g-end').value;
+  if (!startStr || !endStr) return;
+
+  const startD = parseDate(startStr);
+  const endD   = parseDate(endStr);
+  const totalDays = diffDays(startD, endD) + 1;
+  if (totalDays < 1 || totalDays > 365) return;
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  const COL_W = ganttScale === 'week' ? 20 : 30;
+
+  // Build columns
+  const cols = [];
+  for (let i = 0; i < totalDays; i++) {
+    const d = addDays(startD, i);
+    cols.push(d);
+  }
+
+  // Group cols by month for header
+  const months = [];
+  let mStart = 0;
+  for (let i = 0; i < cols.length; i++) {
+    if (i === 0 || cols[i].getMonth() !== cols[i-1].getMonth()) {
+      if (i > 0) months[months.length-1].span = i - mStart;
+      months.push({ label: (cols[i].getMonth()+1) + '月 ' + cols[i].getFullYear(), idx: i });
+      mStart = i;
+    }
+  }
+  months[months.length-1].span = cols.length - mStart;
+
+  // Build rows: one row per section × scene
+  const rows = [];
+  const sceneSet = [...new Set(data.map(r => r.scene))];
+  sceneSet.forEach(scene => {
+    SECTIONS.forEach(sec => {
+      rows.push({ scene, section: sec });
+    });
+  });
+
+  // thead month row
+  let monthThs = `<th class="g-label-col th-base">セクション</th>`;
+  months.forEach(m => {
+    monthThs += `<th colspan="${m.span}" style="color:var(--text);font-size:10px;letter-spacing:.5px;">${m.label}</th>`;
+  });
+
+  // thead day row
+  let dayThs = `<th class="g-label-col th-base"></th>`;
+  cols.forEach(d => {
+    const isToday  = d.getTime() === today.getTime();
+    const isPast   = d < today;
+    const isWknd   = d.getDay() === 0 || d.getDay() === 6;
+    const isHol    = JP_HOLIDAYS.has(fmtDate(d));
+    let style = '';
+    if (isToday)           style = `background:rgba(59,130,246,.35);color:#93c5fd;font-weight:700;border-radius:4px;`;
+    else if (isPast)       style = 'color:#2e3a58;';
+    else if (isWknd)       style = 'color:#f06060;opacity:.75;';
+    else if (isHol)        style = 'color:#f06060;opacity:.85;';
+    dayThs += `<th style="width:${COL_W}px;min-width:${COL_W}px;${style}">${d.getDate()}</th>`;
+  });
+
+  // tbody
+  let tbody = '';
+  rows.forEach((row, ri) => {
+    const bKey = `${row.scene}-${row.section.key}`;
+    const bar  = ganttBars[bKey] || null;
+
+    let cells = `<td class="g-label-col">
+      <div class="g-row-inner">
+        <div class="g-section-dot" style="background:${row.section.color}"></div>
+        <div>
+          <div class="g-row-name">${row.section.label}</div>
+          <div class="g-row-sub">${row.scene}</div>
+        </div>
+      </div>
+    </td>`;
+
+    // Calculate bar position
+    let barHtml = '';
+    if (bar && bar.start && bar.end) {
+      const bs = parseDate(bar.start);
+      const be = parseDate(bar.end);
+      const startOff = Math.max(0, diffDays(startD, bs));
+      const endOff   = Math.min(cols.length - 1, diffDays(startD, be));
+      if (startOff <= endOff) {
+        const left  = startOff * COL_W;
+        const width = (endOff - startOff + 1) * COL_W - 2;
+        const dur   = diffDays(bs, be) + 1;
+        const wDur  = workDays(bs, be);
+        barHtml = `<div class="g-bar"
+          data-bkey="${bKey}"
+          data-start="${bar.start}"
+          data-end="${bar.end}"
+          data-col-w="${COL_W}"
+          data-gantt-start="${startStr}"
+          data-total-cols="${cols.length}"
+          data-scene="${row.scene}"
+          data-section="${row.section.label}"
+          style="left:${left}px;width:${width}px;background:${row.section.color};"
+          onmouseenter="showTooltip(event,'${row.scene}','${row.section.label}','${bar.start}','${bar.end}',${dur})"
+          onmouseleave="hideTooltip()">
+          <div class="g-handle g-handle-l" data-drag="resize-l"></div>
+          <span class="g-bar-label">${wDur}営業日</span>
+          <div class="g-handle g-handle-r" data-drag="resize-r"></div>
+        </div>`;
+      }
+    }
+
+    // cells: first cell spans all cols with relative positioning for bar
+    cells += `<td colspan="${cols.length}" style="position:relative;padding:0;height:40px;" class="g-bar-td"
+      data-bkey="${bKey}" data-title="${row.scene} ${row.section.label}"
+      onclick="onBarTdClick(event,this)">`;
+
+    // draw grid lines
+    cells += `<div style="position:absolute;inset:0;display:flex;pointer-events:none;">`;
+    cols.forEach((d, ci) => {
+      const isToday = d.getTime() === today.getTime();
+      const isPast  = d < today;
+      const isWknd  = d.getDay() === 0 || d.getDay() === 6;
+      const isHol   = JP_HOLIDAYS.has(fmtDate(d));
+      let bg = '';
+      if (isToday)     bg = 'background:rgba(59,130,246,.15);';
+      else if (isPast && isWknd) bg = 'background:rgba(20,20,30,.45);';
+      else if (isPast) bg = 'background:rgba(20,20,30,.3);';
+      else if (isWknd) bg = 'background:rgba(240,80,80,.07);';
+      else if (isHol)  bg = 'background:rgba(240,80,80,.05);';
+      cells += `<div style="width:${COL_W}px;min-width:${COL_W}px;height:100%;border-right:1px solid rgba(38,48,80,.35);${bg}"></div>`;
+    });
+    cells += `</div>`;
+
+    // today line
+    const todayOff = diffDays(startD, today);
+    if (todayOff >= 0 && todayOff < cols.length) {
+      const lx = todayOff * COL_W + COL_W/2 - 1;
+      cells += `<div style="position:absolute;top:0;bottom:0;left:${lx}px;width:2px;background:#60a5fa;opacity:.8;pointer-events:none;z-index:8;"></div>`;
+    }
+
+    cells += barHtml + `</td>`;
+
+    tbody += `<tr>${cells}</tr>`;
+  });
+
+  const html = `<table class="gantt-table">
+    <thead>
+      <tr class="g-month-row">${monthThs}</tr>
+      <tr class="g-day-row">${dayThs}</tr>
+    </thead>
+    <tbody>${tbody}</tbody>
+  </table>`;
+
+  document.getElementById('gantt-grid').innerHTML = html;
+}
+
+/* ── BAR MODAL ── */
+function openBarModal(key, title) {
+  editingBar = key;
+  document.getElementById('bar-modal-title').textContent = title;
+  const bar = ganttBars[key] || {};
+  document.getElementById('bar-start-inp').value = bar.start || document.getElementById('g-start').value;
+  document.getElementById('bar-end-inp').value   = bar.end   || document.getElementById('g-start').value;
+  document.getElementById('bar-modal').classList.add('open');
+}
+function closeBarModal() {
+  document.getElementById('bar-modal').classList.remove('open');
+  editingBar = null;
+}
+function saveBar() {
+  if (!editingBar) return;
+  const s = document.getElementById('bar-start-inp').value;
+  const e = document.getElementById('bar-end-inp').value;
+  if (!s || !e || s > e) { alert('日付を正しく入力してください'); return; }
+  ganttBars[editingBar] = { start: s, end: e };
+  closeBarModal();
+  renderGantt();
+  debouncedSave();
+}
+
+/* ── DRAG & DROP ── */
+let _drag = null; // { type:'move'|'resize-l'|'resize-r', bar, bKey, startX, origStartOff, origEndOff, colW, ganttStart, totalCols }
+let _dragged = false; // distinguish click vs drag
+
+function onBarTdClick(e, td) {
+  if (_dragged) { _dragged = false; return; }
+  if (e.target.closest('.g-bar')) return; // bar click handled separately
+  const bKey  = td.dataset.bkey;
+  const title = td.dataset.title;
+  openBarModal(bKey, title);
+}
+
+document.addEventListener('mousedown', e => {
+  const bar = e.target.closest('.g-bar');
+  if (!bar) return;
+  e.preventDefault();
+  hideTooltip();
+
+  const handle = e.target.dataset.drag;
+  const bKey        = bar.dataset.bkey;
+  const colW        = +bar.dataset.colW;
+  const ganttStart  = parseDate(bar.dataset.ganttStart);
+  const totalCols   = +bar.dataset.totalCols;
+  const bs          = parseDate(bar.dataset.start);
+  const be          = parseDate(bar.dataset.end);
+  const origStartOff = diffDays(ganttStart, bs);
+  const origEndOff   = diffDays(ganttStart, be);
+
+  _drag = {
+    type: handle || 'move',
+    bar, bKey, colW, ganttStart, totalCols,
+    startX: e.clientX,
+    origStartOff, origEndOff,
+    color: bar.style.background,
+  };
+  _dragged = false;
+  bar.style.opacity = '0.75';
+  bar.style.transition = 'none';
+  document.body.style.cursor = handle ? 'ew-resize' : 'grabbing';
+  document.body.style.userSelect = 'none';
+});
+
+document.addEventListener('mousemove', e => {
+  if (!_drag) return;
+  const { type, bar, colW, ganttStart, totalCols, startX, origStartOff, origEndOff } = _drag;
+  const dx   = e.clientX - startX;
+  const dCols = Math.round(dx / colW);
+  if (Math.abs(dx) > 3) _dragged = true;
+
+  let newStartOff = origStartOff;
+  let newEndOff   = origEndOff;
+
+  if (type === 'move') {
+    newStartOff = Math.max(0, Math.min(totalCols - 1, origStartOff + dCols));
+    newEndOff   = newStartOff + (origEndOff - origStartOff);
+    if (newEndOff >= totalCols) {
+      newEndOff   = totalCols - 1;
+      newStartOff = newEndOff - (origEndOff - origStartOff);
+    }
+  } else if (type === 'resize-l') {
+    newStartOff = Math.max(0, Math.min(origEndOff, origStartOff + dCols));
+  } else if (type === 'resize-r') {
+    newEndOff = Math.max(origStartOff, Math.min(totalCols - 1, origEndOff + dCols));
+  }
+
+  const left  = newStartOff * colW;
+  const width = (newEndOff - newStartOff + 1) * colW - 2;
+  bar.style.left  = left + 'px';
+  bar.style.width = width + 'px';
+  const dur = newEndOff - newStartOff + 1;
+  const lbl = bar.querySelector('.g-bar-label');
+  if (lbl) lbl.textContent = dur + '日';
+
+  // live tooltip
+  const tooltip = document.getElementById('g-tooltip');
+  const newStart = fmtDate(addDays(ganttStart, newStartOff));
+  const newEnd   = fmtDate(addDays(ganttStart, newEndOff));
+  const wDur2 = workDays(parseDate(newStart), parseDate(newEnd));
+  tooltip.innerHTML = `<strong>${bar.dataset.scene} / ${bar.dataset.section}</strong>${newStart} → ${newEnd}<br>期間: ${dur}日（営業日: ${wDur2}日）`;
+  tooltip.style.display = 'block';
+  tooltip.style.left = (e.clientX + 14) + 'px';
+  tooltip.style.top  = (e.clientY - 10) + 'px';
+});
+
+document.addEventListener('mouseup', e => {
+  if (!_drag) return;
+  const { type, bar, bKey, colW, ganttStart, totalCols, startX, origStartOff, origEndOff } = _drag;
+  const dx    = e.clientX - startX;
+  const dCols = Math.round(dx / colW);
+
+  let newStartOff = origStartOff;
+  let newEndOff   = origEndOff;
+  if (type === 'move') {
+    newStartOff = Math.max(0, Math.min(totalCols - 1, origStartOff + dCols));
+    newEndOff   = newStartOff + (origEndOff - origStartOff);
+    if (newEndOff >= totalCols) { newEndOff = totalCols - 1; newStartOff = newEndOff - (origEndOff - origStartOff); }
+  } else if (type === 'resize-l') {
+    newStartOff = Math.max(0, Math.min(origEndOff, origStartOff + dCols));
+  } else if (type === 'resize-r') {
+    newEndOff = Math.max(origStartOff, Math.min(totalCols - 1, origEndOff + dCols));
+  }
+
+  ganttBars[bKey] = {
+    start: fmtDate(addDays(ganttStart, newStartOff)),
+    end:   fmtDate(addDays(ganttStart, newEndOff)),
+  };
+
+  bar.style.opacity   = '1';
+  bar.style.transition = '';
+  document.body.style.cursor     = '';
+  document.body.style.userSelect = '';
+  hideTooltip();
+  _drag = null;
+
+  // Re-render only if click didn't happen (avoid flicker on pure click)
+  if (_dragged) { renderGantt(); debouncedSave(); }
+});
+
+// bar click → open modal (only if not dragged)
+document.addEventListener('click', e => {
+  const bar = e.target.closest('.g-bar');
+  if (!bar || _dragged) return;
+  openBarModal(bar.dataset.bkey, `${bar.dataset.scene} ${bar.dataset.section}`);
+}, true);
+
+/* ── TOOLTIP ── */
+function showTooltip(e, scene, sec, start, end, dur) {
+  const t = document.getElementById('g-tooltip');
+  const wD = workDays(parseDate(start), parseDate(end));
+  t.innerHTML = `<strong>${scene} / ${sec}</strong>開始: ${start}<br>終了: ${end}<br>期間: ${dur}日（営業日: ${wD}日）`;
+  t.style.display = 'block';
+  moveTooltip(e);
+}
+function moveTooltip(e) {
+  const t = document.getElementById('g-tooltip');
+  t.style.left = (e.clientX + 14) + 'px';
+  t.style.top  = (e.clientY - 10) + 'px';
+}
+function hideTooltip() {
+  document.getElementById('g-tooltip').style.display = 'none';
+}
+
+function scrollToToday() {
+  const grid = document.getElementById('gantt-grid');
+  const startStr = document.getElementById('g-start').value;
+  if (!startStr) return;
+  const startD = parseDate(startStr);
+  const today  = new Date(); today.setHours(0,0,0,0);
+  const off = diffDays(startD, today);
+  const COL_W = ganttScale === 'week' ? 20 : 30;
+  grid.scrollLeft = Math.max(0, off * COL_W);
+}
+
+/* init gantt dates on load */
+initGanttDates();
+document.getElementById('g-start').addEventListener('change', renderGantt);
+document.getElementById('g-end').addEventListener('change', renderGantt);
+document.getElementById('bar-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('bar-modal')) closeBarModal();
+});
+
+</script>
+</body>
+</html>
