@@ -164,6 +164,7 @@ body {
 .prog-bar-bg { flex: 1; height: 5px; background: var(--s3); border-radius: 99px; overflow: hidden; }
 .prog-bar-fill { height: 100%; border-radius: 99px; width: 0; transition: width .4s ease; }
 .prog-pct { font-family: 'DM Sans', sans-serif; font-size: 11px; font-weight: 600; width: 30px; text-align: right; }
+.prog-count { font-family: 'DM Sans', sans-serif; font-size: 10px; color: var(--dim); width: 36px; text-align: right; letter-spacing: .3px; }
 
 /* ===== SCENE PANEL ===== */
 .scene-panel {
@@ -247,7 +248,7 @@ body {
 }
 
 /* scene / cut cell */
-.td-scene, .td-cut { width: 110px; }
+.td-scene, .td-cut { width: 110px; min-width: 90px; white-space: normal; word-break: break-all; }
 
 .cell-sel {
   width: 100%;
@@ -256,7 +257,7 @@ body {
   font-size: 12px; font-family: 'DM Sans', sans-serif;
   font-weight: 600; color: var(--bright);
   cursor: pointer; outline: none; transition: all .15s;
-  text-align: center;
+  text-align: center; white-space: normal; word-break: break-all;
 }
 .cell-sel:hover  { background: var(--s3); border-color: var(--border2); }
 .cell-sel:focus  { background: var(--s3); border-color: var(--blue); }
@@ -320,6 +321,7 @@ body {
 .st-none { background: rgba(255,255,255,.05); color: var(--dim); border-color: var(--border); }
 .st-wip  { background: rgba(240,160,48,.18); color: var(--amber); border-color: rgba(240,160,48,.4); }
 .st-done { background: rgba(40,195,138,.18); color: var(--green); border-color: rgba(40,195,138,.4); }
+.st-na   { background: rgba(30,30,40,.4); color: #3a4060; border-color: rgba(50,55,80,.3); }
 .status-sel:hover { filter: brightness(1.15); }
 
 /* assignee select */
@@ -830,21 +832,25 @@ body {
     <span class="prog-name prog-track">Tracking</span>
     <div class="prog-bar-bg"><div class="prog-bar-fill" id="pb-track" style="background:var(--blue)"></div></div>
     <span class="prog-pct prog-track" id="pp-track">0%</span>
+    <span class="prog-count" id="pc-track">0/0</span>
   </div>
   <div class="prog-item">
     <span class="prog-name prog-key">Keying</span>
     <div class="prog-bar-bg"><div class="prog-bar-fill" id="pb-key" style="background:var(--purple)"></div></div>
     <span class="prog-pct prog-key" id="pp-key">0%</span>
+    <span class="prog-count" id="pc-key">0/0</span>
   </div>
   <div class="prog-item">
     <span class="prog-name prog-cg">CG Render</span>
     <div class="prog-bar-bg"><div class="prog-bar-fill" id="pb-cg" style="background:var(--amber)"></div></div>
     <span class="prog-pct prog-cg" id="pp-cg">0%</span>
+    <span class="prog-count" id="pc-cg">0/0</span>
   </div>
   <div class="prog-item">
     <span class="prog-name prog-comp">Composite</span>
     <div class="prog-bar-bg"><div class="prog-bar-fill" id="pb-comp" style="background:var(--green)"></div></div>
     <span class="prog-pct prog-comp" id="pp-comp">0%</span>
+    <span class="prog-count" id="pc-comp">0/0</span>
   </div>
 </div>
 
@@ -1303,22 +1309,25 @@ function deleteMember(i) {
 
 /* ── HELPERS ── */
 function stClass(v) {
-  return v === '作業中' ? 'st-wip' : v === '完了' ? 'st-done' : 'st-none';
+  return v === '作業中' ? 'st-wip' : v === '完了' ? 'st-done' : v === 'なし' ? 'st-na' : 'st-none';
 }
 function stSel(i, f, v) {
   return `<select class="status-sel ${stClass(v)}" data-i="${i}" data-f="${f}" onchange="onStatus(this)">
+    <option value="なし"   ${v==='なし'  ?'selected':''}>なし</option>
     <option value="未着手" ${v==='未着手'?'selected':''}>未着手</option>
     <option value="作業中" ${v==='作業中'?'selected':''}>作業中</option>
     <option value="完了"   ${v==='完了'  ?'selected':''}>完了</option>
   </select>`;
 }
-function asnInp(i, f, v) {
+function asnInp(i, f, v, disabled) {
   const opts = members.map(m => `<option value="${esc(m)}" ${v===m?'selected':''}>${esc(m)}</option>`).join('');
-  return `<select class="asn-select" data-i="${i}" data-f="${f}" onchange="onInp(this)">${opts}</select>`;
+  const dis = disabled ? 'disabled style="opacity:.25;pointer-events:none;background:rgba(20,20,30,.4);color:#2a3650;"' : '';
+  return `<select class="asn-select" data-i="${i}" data-f="${f}" onchange="onInp(this)" ${dis}>${opts}</select>`;
 }
-function memoInp(i, f, v) {
+function memoInp(i, f, v, disabled) {
+  const dis = disabled ? 'disabled style="opacity:.25;pointer-events:none;background:rgba(20,20,30,.4);color:#2a3650;resize:none;"' : '';
   return `<textarea class="memo-input" data-i="${i}" data-f="${f}"
-    placeholder="メモ..." oninput="onMemo(this)" rows="1">${esc(v)}</textarea>`;
+    placeholder="メモ..." oninput="onMemo(this)" rows="1" ${dis}>${esc(v)}</textarea>`;
 }
 function esc(s) { return s.replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
 
@@ -1395,17 +1404,17 @@ function render() {
       </td>
       <td class="td-cgcontent"><input class="cg-input" type="text" value="${esc(row.cgContent)}" placeholder="CG内容..." data-i="${i}" data-f="cgContent" onchange="onInp(this)" /></td>
       <td class="td-track">${stSel(i,'tracking',row.tracking)}</td>
-      <td class="td-track">${asnInp(i,'trackingAsn',row.trackingAsn)}</td>
-      <td class="td-track">${memoInp(i,'trackingMemo',row.trackingMemo)}</td>
+      <td class="td-track">${asnInp(i,'trackingAsn',row.trackingAsn, row.tracking==='なし')}</td>
+      <td class="td-track">${memoInp(i,'trackingMemo',row.trackingMemo, row.tracking==='なし')}</td>
       <td class="td-key">${stSel(i,'keying',row.keying)}</td>
-      <td class="td-key">${asnInp(i,'keyingAsn',row.keyingAsn)}</td>
+      <td class="td-key">${asnInp(i,'keyingAsn',row.keyingAsn, row.keying==='なし')}</td>
       <td class="td-key">${stSel(i,'keyingFix',row.keyingFix)}</td>
-      <td class="td-key">${memoInp(i,'keyingMemo',row.keyingMemo)}</td>
+      <td class="td-key">${memoInp(i,'keyingMemo',row.keyingMemo, row.keying==='なし')}</td>
       <td class="td-cg">${stSel(i,'cgRender',row.cgRender)}</td>
-      <td class="td-cg">${memoInp(i,'cgMemo',row.cgMemo)}</td>
+      <td class="td-cg">${memoInp(i,'cgMemo',row.cgMemo, row.cgRender==='なし')}</td>
       <td class="td-comp">${stSel(i,'comp',row.comp)}</td>
-      <td class="td-comp">${asnInp(i,'compAsn',row.compAsn)}</td>
-      <td class="td-comp">${memoInp(i,'compMemo',row.compMemo)}</td>
+      <td class="td-comp">${asnInp(i,'compAsn',row.compAsn, row.comp==='なし')}</td>
+      <td class="td-comp">${memoInp(i,'compMemo',row.compMemo, row.comp==='なし')}</td>
     </tr>`;
   });
 
@@ -1482,23 +1491,31 @@ async function onThumb(input, i) {
 
 /* ── STATS ── */
 function pct(done, total) { return total > 0 ? Math.round(done/total*100) : 0; }
-function setBar(id, p, color) {
+function setBar(id, p, done, total) {
   document.getElementById('pb-'+id).style.width = p + '%';
   document.getElementById('pp-'+id).textContent = p + '%';
+  const pc = document.getElementById('pc-'+id);
+  if (pc) pc.textContent = done + '/' + total;
 }
 function updateStats() {
   const n = data.length;
   if (!n) return;
+
+  // 「なし」のカットは分母から除外
+  const tActive  = data.filter(r=>r.tracking!=='なし').length;
+  const kActive  = data.filter(r=>r.keying!=='なし').length;
+  const cgActive = data.filter(r=>r.cgRender!=='なし').length;
+  const cActive  = data.filter(r=>r.comp!=='なし').length;
 
   const tDone  = data.filter(r=>r.tracking==='完了').length;
   const kDone  = data.filter(r=>r.keying==='完了').length + data.filter(r=>r.keyingFix==='完了').length;
   const cgDone = data.filter(r=>r.cgRender==='完了').length;
   const cDone  = data.filter(r=>r.comp==='完了').length;
 
-  setBar('track', pct(tDone, n));
-  setBar('key',   pct(kDone, n*2));
-  setBar('cg',    pct(cgDone, n));
-  setBar('comp',  pct(cDone, n));
+  setBar('track', pct(tDone, tActive),  tDone,  tActive);
+  setBar('key',   pct(kDone, kActive*2), kDone, kActive);
+  setBar('cg',    pct(cgDone, cgActive), cgDone, cgActive);
+  setBar('comp',  pct(cDone, cActive),   cDone,  cActive);
 
   const fields = ['tracking','keying','keyingFix','cgRender','comp'];
   let done=0, wip=0;
