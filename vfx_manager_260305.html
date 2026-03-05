@@ -248,7 +248,7 @@ body {
 }
 
 /* scene / cut cell */
-.td-scene, .td-cut { width: 110px; min-width: 90px; white-space: normal; word-break: break-all; }
+/* td-scene/td-cut は SCENE COLORS セクションで定義 */
 
 .cell-sel {
   width: 100%;
@@ -744,6 +744,40 @@ body {
   z-index: 5;
 }
 .ph-card:hover .ph-card-del { display: block; }
+
+/* ===== SCENE COLORS ===== */
+:root {
+  --sc0: rgba(91,156,246,.10);  /* blue */
+  --sc1: rgba(169,111,244,.10); /* purple */
+  --sc2: rgba(240,160,48,.10);  /* amber */
+  --sc3: rgba(40,195,138,.10);  /* green */
+  --sc4: rgba(240,80,120,.10);  /* pink */
+  --sc5: rgba(80,200,240,.10);  /* cyan */
+  --sc6: rgba(200,160,80,.10);  /* gold */
+  --sc7: rgba(160,200,80,.10);  /* lime */
+  --sc0-bd: rgba(91,156,246,.35);
+  --sc1-bd: rgba(169,111,244,.35);
+  --sc2-bd: rgba(240,160,48,.35);
+  --sc3-bd: rgba(40,195,138,.35);
+  --sc4-bd: rgba(240,80,120,.35);
+  --sc5-bd: rgba(80,200,240,.35);
+  --sc6-bd: rgba(200,160,80,.35);
+  --sc7-bd: rgba(160,200,80,.35);
+}
+.sc-label {
+  display: inline-block;
+  padding: 2px 8px; border-radius: 99px;
+  font-size: 11px; font-weight: 700;
+  white-space: normal; word-break: break-all;
+  line-height: 1.4; cursor: pointer;
+  width: 100%; text-align: center;
+}
+.sc-label:hover { filter: brightness(1.2); }
+
+/* Scene/Cut列の幅 */
+.td-scene { width: 100px; min-width: 80px; }
+.td-cut   { width: 110px; min-width: 90px; }
+
 </style>
 </head>
 <body>
@@ -1331,16 +1365,55 @@ function memoInp(i, f, v, disabled) {
 }
 function esc(s) { return s.replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
 
+const SCENE_PALETTE = [
+  {bg:'rgba(91,156,246,.18)',  bd:'rgba(91,156,246,.5)',  tx:'#7fb3f8'},
+  {bg:'rgba(169,111,244,.18)', bd:'rgba(169,111,244,.5)', tx:'#c49af8'},
+  {bg:'rgba(240,160,48,.18)',  bd:'rgba(240,160,48,.5)',  tx:'#f0c060'},
+  {bg:'rgba(40,195,138,.18)',  bd:'rgba(40,195,138,.5)',  tx:'#50d8a0'},
+  {bg:'rgba(240,80,120,.18)',  bd:'rgba(240,80,120,.5)',  tx:'#f87090'},
+  {bg:'rgba(80,200,240,.18)',  bd:'rgba(80,200,240,.5)',  tx:'#60d0f8'},
+  {bg:'rgba(200,160,80,.18)',  bd:'rgba(200,160,80,.5)',  tx:'#f0c870'},
+  {bg:'rgba(160,200,80,.18)',  bd:'rgba(160,200,80,.5)',  tx:'#b0d860'},
+];
+
+function sceneColorIdx(sceneName) {
+  return scenes.indexOf(sceneName) % SCENE_PALETTE.length;
+}
+
 function sceneSel(i, v) {
+  const ci = sceneColorIdx(v);
+  const p  = SCENE_PALETTE[ci];
   const opts = scenes.map(s => `<option value="${s}" ${v===s?'selected':''}>${s}</option>`).join('');
-  return `<select class="cell-sel" data-i="${i}" data-f="scene" onchange="onScene(this)">${opts}</select>`;
+  return `<div style="position:relative;">
+    <div class="sc-label" style="background:${p.bg};border:1px solid ${p.bd};color:${p.tx};"
+      onclick="document.getElementById('sc-sel-${i}').style.display='block';document.getElementById('sc-sel-${i}').focus()">
+      ${v}
+    </div>
+    <select id="sc-sel-${i}" class="cell-sel" data-i="${i}" data-f="scene"
+      style="position:absolute;top:0;left:0;opacity:0;width:100%;height:100%;cursor:pointer;"
+      onchange="onScene(this)" onblur="this.style.display='none'">
+      ${opts}
+    </select>
+  </div>`;
 }
 function cutSel(i, scene, v) {
+  const ci = sceneColorIdx(scene);
+  const p  = SCENE_PALETTE[ci];
   const opts = Array.from({length:20},(_,k)=>{
-    const c = cutLabel(scene, k+1);
-    return `<option value="${c}" ${v===c?'selected':''}>${c}</option>`;
+    const cv = cutLabel(scene, k+1);
+    return `<option value="${cv}" ${v===cv?'selected':''}>${cv}</option>`;
   }).join('');
-  return `<select class="cell-sel" data-i="${i}" data-f="cut" onchange="onInp(this)">${opts}</select>`;
+  return `<div style="position:relative;">
+    <div class="sc-label" style="background:${p.bg};border:1px solid ${p.bd};color:${p.tx};"
+      onclick="document.getElementById('cut-sel-${i}').style.display='block';document.getElementById('cut-sel-${i}').focus()">
+      ${v}
+    </div>
+    <select id="cut-sel-${i}" class="cell-sel" data-i="${i}" data-f="cut"
+      style="position:absolute;top:0;left:0;opacity:0;width:100%;height:100%;cursor:pointer;"
+      onchange="onInp(this)" onblur="this.style.display='none'">
+      ${opts}
+    </select>
+  </div>`;
 }
 
 /* ── RENDER ── */
@@ -1392,7 +1465,9 @@ function render() {
       ? `<button class="thumb-del-btn" onclick="deleteThumb(event,${i})" title="画像を削除">✕</button>`
       : '';
 
-    html += `<tr>
+    const rci = sceneColorIdx(row.scene);
+    const rp  = SCENE_PALETTE[rci];
+    html += `<tr style="background:${rp.bg};">
       <td class="td-scene">${sceneSel(i, row.scene)}</td>
       <td class="td-cut">${cutSel(i, row.scene, row.cut)}</td>
       <td class="td-thumb">
