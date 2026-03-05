@@ -470,7 +470,7 @@ body {
 .gantt-wrap {
   margin: 20px 24px;
   background: var(--s1); border: 1px solid var(--border);
-  border-radius: 12px; overflow: hidden;
+  border-radius: 12px;
   box-shadow: 0 2px 12px rgba(0,0,0,.25);
   animation: fadeUp .3s ease both;
 }
@@ -554,16 +554,16 @@ body {
 .g-cell.weekend   { background: rgba(255,255,255,.015); }
 .g-bar-td { position: relative; overflow: visible; }
 .g-bar {
-  position: absolute; top: 50%; transform: translateY(-50%);
-  height: 20px; border-radius: 5px; cursor: grab;
-  transition: filter .15s, height .15s;
+  position: absolute;
+  border-radius: 5px; cursor: grab;
+  transition: filter .15s;
   display: flex; align-items: center; padding: 0 7px;
   font-size: 10px; font-weight: 600; color: rgba(255,255,255,.9);
   white-space: nowrap; overflow: hidden; z-index: 5;
   box-shadow: 0 2px 6px rgba(0,0,0,.35);
   user-select: none;
 }
-.g-bar:hover { height: 24px; filter: brightness(1.15); z-index: 6; }
+.g-bar:hover { filter: brightness(1.15); z-index: 6; }
 .g-handle {
   position: absolute; top: 0; bottom: 0; width: 6px;
   cursor: ew-resize; background: rgba(255,255,255,.2);
@@ -2176,6 +2176,8 @@ document.addEventListener('mousedown', e => {
     bar, bKey, barId, colW, ganttStart, totalCols,
     startX: e.clientX,
     origStartOff, origEndOff,
+    origTop: bar.style.top,
+    origHeight: bar.style.height,
     color: bar.style.background,
   };
   _dragged = false;
@@ -2210,8 +2212,10 @@ document.addEventListener('mousemove', e => {
 
   const left  = newStartOff * colW;
   const width = (newEndOff - newStartOff + 1) * colW - 2;
-  bar.style.left  = left + 'px';
-  bar.style.width = width + 'px';
+  bar.style.left   = left + 'px';
+  bar.style.width  = width + 'px';
+  bar.style.top    = _drag.origTop;
+  bar.style.height = _drag.origHeight;
   const dur = newEndOff - newStartOff + 1;
   const lbl = bar.querySelector('.g-bar-label');
   if (lbl) lbl.textContent = dur + '日';
@@ -2250,10 +2254,11 @@ document.addEventListener('mouseup', e => {
   if (!Array.isArray(ganttBars[bKey])) {
     ganttBars[bKey] = ganttBars[bKey] ? [ganttBars[bKey]] : [];
   }
-  const bidx = ganttBars[bKey].findIndex(b => b.id === barId);
+  const { barId: _barId } = _drag;
+  const bidx = ganttBars[bKey].findIndex(b => b.id === _barId);
   if (bidx >= 0) {
     ganttBars[bKey][bidx] = {
-      id: barId,
+      ...ganttBars[bKey][bidx],
       start: fmtDate(addDays(ganttStart, newStartOff)),
       end:   fmtDate(addDays(ganttStart, newEndOff)),
     };
@@ -2261,6 +2266,8 @@ document.addEventListener('mouseup', e => {
 
   bar.style.opacity   = '1';
   bar.style.transition = '';
+  bar.style.top    = _drag.origTop;
+  bar.style.height = _drag.origHeight;
   document.body.style.cursor     = '';
   document.body.style.userSelect = '';
   hideTooltip();
