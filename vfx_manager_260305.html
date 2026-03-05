@@ -1544,17 +1544,15 @@ function onScene(el) {
   const i = +el.dataset.i;
   const newScene = el.value;
   data[i].scene = newScene;
-  // 同シーンで使われているCut番号を収集
+  // 同シーンの最大Cut番号+1を割り当て
   const usedNums = data
     .filter((r, ri) => ri !== i && r.scene === newScene)
     .map(r => {
       const m = r.cut.match(/-C(\d+)$/);
       return m ? parseInt(m[1]) : 0;
     });
-  // 使われていない最小番号を割り当て
-  let n = 1;
-  while (usedNums.includes(n)) n++;
-  data[i].cut = cutLabel(newScene, n);
+  const maxN = usedNums.length > 0 ? Math.max(...usedNums) : 0;
+  data[i].cut = cutLabel(newScene, maxN + 1);
   render();
   debouncedSave();
 }
@@ -1866,17 +1864,14 @@ function renderGantt() {
   }
   months[months.length-1].span = cols.length - mStart;
 
-  // Build rows: one row per section × scene
+  // Build rows: one row per section（工程ごとに1行）
   const rows = [];
-  const sceneSet = [...new Set(data.map(r => r.scene))];
-  sceneSet.forEach(scene => {
-    SECTIONS.forEach(sec => {
-      rows.push({ scene, section: sec });
-    });
+  SECTIONS.forEach(sec => {
+    rows.push({ section: sec });
   });
 
   // thead month row
-  let monthThs = `<th class="g-label-col th-base">セクション</th>`;
+  let monthThs = `<th class="g-label-col th-base">工程</th>`;
   months.forEach(m => {
     monthThs += `<th colspan="${m.span}" style="color:var(--text);font-size:10px;letter-spacing:.5px;">${m.label}</th>`;
   });
@@ -1899,7 +1894,7 @@ function renderGantt() {
   // tbody
   let tbody = '';
   rows.forEach((row, ri) => {
-    const bKey = `${row.scene}-${row.section.key}`;
+    const bKey = `${row.section.key}`;
     const bar  = ganttBars[bKey] || null;
 
     let cells = `<td class="g-label-col">
@@ -1907,7 +1902,6 @@ function renderGantt() {
         <div class="g-section-dot" style="background:${row.section.color}"></div>
         <div>
           <div class="g-row-name">${row.section.label}</div>
-          <div class="g-row-sub">${row.scene}</div>
         </div>
       </div>
     </td>`;
