@@ -707,6 +707,7 @@ body {
 
 <!-- TAB: SHOTS -->
 <div class="tab-page active" id="tab-shots">
+  <div id="shot-container"></div>
   <button class="add-row-btn" id="add-btn">＋ カットを追加</button>
 </div>
 
@@ -1130,7 +1131,7 @@ function render() {
   });
 
   html += `</tbody></table></div></div>`;
-  document.getElementById('app').innerHTML = html;
+  document.getElementById('shot-container').innerHTML = html;
   // auto-resize all textareas after render
   document.querySelectorAll('.memo-input').forEach(ta => {
     ta.style.height = 'auto';
