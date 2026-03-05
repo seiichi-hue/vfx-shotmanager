@@ -632,7 +632,7 @@ body {
   <div style="font-size:11px;color:#2a3650;">アクセス権限のあるGoogleアカウントでサインインしてください</div>
 </div>
 
-<div id="app" style="display:none;">
+<div id="app" style="visibility:hidden;pointer-events:none;">
 <!-- HEADER -->
 <div class="header">
   <div class="logo-wrap">
@@ -707,7 +707,6 @@ body {
 
 <!-- TAB: SHOTS -->
 <div class="tab-page active" id="tab-shots">
-  <div id="app"></div>
   <button class="add-row-btn" id="add-btn">＋ カットを追加</button>
 </div>
 
@@ -1229,12 +1228,14 @@ function updateStats() {
 auth.onAuthStateChanged(user => {
   if (user) {
     document.getElementById('login-screen').style.display = 'none';
-    document.getElementById('app').style.display = 'block';
+    document.getElementById('app').style.visibility = 'visible';
+    document.getElementById('app').style.pointerEvents = 'auto';
     document.getElementById('user-info').textContent = user.displayName || user.email;
     loadFromFirebase();
   } else {
     document.getElementById('login-screen').style.display = 'flex';
-    document.getElementById('app').style.display = 'none';
+    document.getElementById('app').style.visibility = 'hidden';
+    document.getElementById('app').style.pointerEvents = 'none';
   }
 });
 
