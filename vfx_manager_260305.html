@@ -778,6 +778,21 @@ body {
 .td-scene { width: 100px; min-width: 80px; }
 .td-cut   { width: 110px; min-width: 90px; }
 
+
+/* ===== ROW DRAG & DROP ===== */
+.drag-handle {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 100%; min-height: 36px;
+  cursor: grab; color: var(--border2);
+  font-size: 13px; user-select: none;
+  transition: color .15s;
+}
+.drag-handle:hover { color: var(--dim); }
+.drag-handle:active { cursor: grabbing; }
+.td-drag { width: 20px; padding: 0 2px !important; }
+tr.drag-over-top    td { border-top: 2px solid var(--blue) !important; }
+tr.drag-over-bottom td { border-bottom: 2px solid var(--blue) !important; }
+tr.dragging { opacity: .35; }
 </style>
 </head>
 <body>
@@ -1431,6 +1446,7 @@ function render() {
     <table class="shot-table">
       <thead>
         <tr>
+          <th class="th-base td-drag" rowspan="2"></th>
           <th class="th-base" rowspan="2">Scene</th>
           <th class="th-base" rowspan="2">Cut</th>
           <th class="th-base" rowspan="2">キャプチャ</th>
@@ -1468,7 +1484,13 @@ function render() {
     const rci = sceneColorIdx(row.scene);
     const rp  = SCENE_PALETTE[rci];
     const scBg = `background:${rp.bg};border-left:3px solid ${rp.bd};`;
-    html += `<tr>
+    html += `<tr draggable="true" data-row="${i}"
+      ondragstart="rowDragStart(event,${i})"
+      ondragover="rowDragOver(event,${i})"
+      ondragleave="rowDragLeave(event)"
+      ondrop="rowDrop(event,${i})"
+      ondragend="rowDragEnd(event)">
+      <td class="td-drag"><span class="drag-handle">⠿</span></td>
       <td class="td-scene" style="${scBg}">${sceneSel(i, row.scene)}</td>
       <td class="td-cut" style="${scBg}">${cutSel(i, row.scene, row.cut)}</td>
       <td class="td-thumb" style="${scBg}">
@@ -1577,6 +1599,63 @@ async function onThumb(input, i) {
 }
 
 /* ── STATS ── */
+
+/* ── ROW DRAG & DROP ── */
+let _dragSrcRow = null;
+
+function rowDragStart(e, i) {
+  _dragSrcRow = i;
+  e.currentTarget.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', i);
+}
+
+function rowDragOver(e, i) {
+  if (_dragSrcRow === null || _dragSrcRow === i) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  const tr = e.currentTarget;
+  const rect = tr.getBoundingClientRect();
+  const mid  = rect.top + rect.height / 2;
+  // 全行のdrag-over classを消す
+  document.querySelectorAll('tr.drag-over-top, tr.drag-over-bottom').forEach(r => {
+    r.classList.remove('drag-over-top', 'drag-over-bottom');
+  });
+  tr.classList.add(e.clientY < mid ? 'drag-over-top' : 'drag-over-bottom');
+}
+
+function rowDragLeave(e) {
+  e.currentTarget.classList.remove('drag-over-top', 'drag-over-bottom');
+}
+
+function rowDrop(e, i) {
+  e.preventDefault();
+  if (_dragSrcRow === null || _dragSrcRow === i) return;
+  const tr   = e.currentTarget;
+  const rect = tr.getBoundingClientRect();
+  const mid  = rect.top + rect.height / 2;
+  const after = e.clientY >= mid;
+
+  // 配列の並び替え
+  const moved = data.splice(_dragSrcRow, 1)[0];
+  let insertAt = i > _dragSrcRow ? i - 1 : i;
+  if (after) insertAt++;
+  data.splice(insertAt, 0, moved);
+
+  tr.classList.remove('drag-over-top', 'drag-over-bottom');
+  _dragSrcRow = null;
+  render();
+  debouncedSave();
+}
+
+function rowDragEnd(e) {
+  e.currentTarget.classList.remove('dragging');
+  document.querySelectorAll('tr.drag-over-top, tr.drag-over-bottom').forEach(r => {
+    r.classList.remove('drag-over-top', 'drag-over-bottom');
+  });
+  _dragSrcRow = null;
+}
+
 function pct(done, total) { return total > 0 ? Math.round(done/total*100) : 0; }
 function setBar(id, p, done, total) {
   document.getElementById('pb-'+id).style.width = p + '%';
