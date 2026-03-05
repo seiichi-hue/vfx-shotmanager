@@ -927,6 +927,7 @@ tr.dragging { opacity: .35; }
         <button class="gantt-scale-btn active" id="scale-day" onclick="setScale('day',this)">日</button>
         <button class="gantt-scale-btn" id="scale-week" onclick="setScale('week',this)">週</button>
       </div>
+      <span id="gantt-today-label" style="font-size:12px;color:var(--dim);font-family:'DM Sans',sans-serif;"></span>
       <button class="gantt-today-btn" onclick="scrollToToday()">今日</button>
     </div>
     <div class="gantt-grid" id="gantt-grid"></div>
@@ -1953,11 +1954,19 @@ function renderGantt() {
     dayThs += `<th style="width:${COL_W}px;min-width:${COL_W}px;${style}">${d.getDate()}</th>`;
   });
 
+  // 今日の日付をツールバーに表示
+  const todayLabel = document.getElementById('gantt-today-label');
+  if (todayLabel) {
+    const wd = ['日','月','火','水','木','金','土'][today.getDay()];
+    todayLabel.textContent = `${today.getFullYear()}/${String(today.getMonth()+1).padStart(2,'0')}/${String(today.getDate()).padStart(2,'0')}（${wd}）`;
+  }
+
   // tbody
   let tbody = '';
   rows.forEach((row, ri) => {
     const bKey = `${row.section.key}`;
-    const bar  = ganttBars[bKey] || null;
+    // 複数バー: ganttBars[bKey] は配列
+    const bars = Array.isArray(ganttBars[bKey]) ? ganttBars[bKey] : (ganttBars[bKey] ? [ganttBars[bKey]] : []);
 
     let cells = `<td class="g-label-col" style="position:relative;">
       <div class="g-row-inner">
@@ -1975,40 +1984,55 @@ function renderGantt() {
       </div>
     </td>`;
 
-    // Calculate bar position
+    // Calculate bar positions (複数バー対応)
     let barHtml = '';
-    if (bar && bar.start && bar.end) {
+    const ROW_H = 40;
+    const BAR_H = 18;
+    // バーを時系列でソートして縦位置を割り当て（重なり回避）
+    const sorted = [...bars].sort((a,b) => a.start > b.start ? 1 : -1);
+    // 使用済みレーン管理
+    const laneEnds = []; // lane毎の終了offset
+    sorted.forEach(bar => {
+      if (!bar || !bar.start || !bar.end) return;
+      const barId = bar.id || bKey;
       const bs = parseDate(bar.start);
       const be = parseDate(bar.end);
       const startOff = Math.max(0, diffDays(startD, bs));
       const endOff   = Math.min(cols.length - 1, diffDays(startD, be));
-      if (startOff <= endOff) {
-        const left  = startOff * COL_W;
-        const width = (endOff - startOff + 1) * COL_W - 2;
-        const dur   = diffDays(bs, be) + 1;
-        const wDur  = workDays(bs, be);
-        barHtml = `<div class="g-bar"
-          data-bkey="${bKey}"
-          data-start="${bar.start}"
-          data-end="${bar.end}"
-          data-col-w="${COL_W}"
-          data-gantt-start="${startStr}"
-          data-total-cols="${cols.length}"
-          data-scene="${row.scene}"
-          data-section="${row.section.label}"
-          style="left:${left}px;width:${width}px;background:${row.section.color};"
-          onmouseenter="showTooltip(event,'${row.scene}','${row.section.label}','${bar.start}','${bar.end}',${dur})"
-          onmouseleave="hideTooltip()">
-          <div class="g-handle g-handle-l" data-drag="resize-l"></div>
-          <span class="g-bar-label">${wDur}営業日</span>
-          <div class="g-handle g-handle-r" data-drag="resize-r"></div>
-        </div>`;
-      }
-    }
+      if (startOff > endOff) return;
+      // 空きレーンを探す
+      let lane = 0;
+      while (laneEnds[lane] !== undefined && laneEnds[lane] >= startOff) lane++;
+      laneEnds[lane] = endOff;
+      const left  = startOff * COL_W;
+      const width = (endOff - startOff + 1) * COL_W - 2;
+      const dur   = diffDays(bs, be) + 1;
+      const wDur  = workDays(bs, be);
+      const top   = 4 + lane * (BAR_H + 3);
+      barHtml += `<div class="g-bar"
+        data-bkey="${bKey}"
+        data-bar-id="${barId}"
+        data-start="${bar.start}"
+        data-end="${bar.end}"
+        data-col-w="${COL_W}"
+        data-gantt-start="${startStr}"
+        data-total-cols="${cols.length}"
+        data-scene=""
+        data-section="${row.section.label}"
+        style="left:${left}px;width:${width}px;top:${top}px;height:${BAR_H}px;background:${row.section.color};"
+        onmouseenter="showTooltip(event,'','${row.section.label}','${bar.start}','${bar.end}',${dur})"
+        onmouseleave="hideTooltip()">
+        <div class="g-handle g-handle-l" data-drag="resize-l"></div>
+        <span class="g-bar-label" style="font-size:9px;">${wDur}営業日</span>
+        <div class="g-handle g-handle-r" data-drag="resize-r"></div>
+      </div>`;
+    });
+    // 行の高さを動的に調整
+    const rowH = Math.max(ROW_H, 4 + laneEnds.length * (BAR_H + 3) + 4);
 
     // cells: first cell spans all cols with relative positioning for bar
-    cells += `<td colspan="${cols.length}" style="position:relative;padding:0;height:40px;" class="g-bar-td"
-      data-bkey="${bKey}" data-title="${row.scene} ${row.section.label}"
+    cells += `<td colspan="${cols.length}" style="position:relative;padding:0;height:${rowH}px;" class="g-bar-td"
+      data-bkey="${bKey}" data-title="${row.section.label}"
       onclick="onBarTdClick(event,this)">`;
 
     // draw grid lines
@@ -2069,12 +2093,18 @@ function renderGantt() {
 }
 
 /* ── BAR MODAL ── */
-function openBarModal(key, title) {
-  editingBar = key;
+let editingBarId = null; // 編集中のbar.id（新規はnull）
+
+function openBarModal(key, title, barId) {
+  editingBar   = key;
+  editingBarId = barId || null;
   document.getElementById('bar-modal-title').textContent = title;
-  const bar = ganttBars[key] || {};
-  document.getElementById('bar-start-inp').value = bar.start || document.getElementById('g-start').value;
-  document.getElementById('bar-end-inp').value   = bar.end   || document.getElementById('g-start').value;
+  const bars = Array.isArray(ganttBars[key]) ? ganttBars[key] : (ganttBars[key] ? [ganttBars[key]] : []);
+  const bar  = barId ? bars.find(b => b.id === barId) : null;
+  document.getElementById('bar-start-inp').value = bar ? bar.start : document.getElementById('g-start').value;
+  document.getElementById('bar-end-inp').value   = bar ? bar.end   : document.getElementById('g-start').value;
+  // 削除ボタンは既存バー編集時のみ表示
+  document.querySelector('.bar-delete-btn').style.display = barId ? 'inline-flex' : 'none';
   document.getElementById('bar-modal').classList.add('open');
 }
 function closeBarModal() {
@@ -2086,14 +2116,27 @@ function saveBar() {
   const s = document.getElementById('bar-start-inp').value;
   const e = document.getElementById('bar-end-inp').value;
   if (!s || !e || s > e) { alert('日付を正しく入力してください'); return; }
-  ganttBars[editingBar] = { start: s, end: e };
+  if (!Array.isArray(ganttBars[editingBar])) {
+    ganttBars[editingBar] = ganttBars[editingBar] ? [ganttBars[editingBar]] : [];
+  }
+  if (editingBarId) {
+    // 既存バーを更新
+    const idx = ganttBars[editingBar].findIndex(b => b.id === editingBarId);
+    if (idx >= 0) ganttBars[editingBar][idx] = { id: editingBarId, start: s, end: e };
+  } else {
+    // 新規バーを追加
+    const newId = editingBar + '_' + Date.now();
+    ganttBars[editingBar].push({ id: newId, start: s, end: e });
+  }
   closeBarModal();
   renderGantt();
   debouncedSave();
 }
 function deleteBar() {
-  if (!editingBar) return;
-  delete ganttBars[editingBar];
+  if (!editingBar || !editingBarId) return;
+  if (Array.isArray(ganttBars[editingBar])) {
+    ganttBars[editingBar] = ganttBars[editingBar].filter(b => b.id !== editingBarId);
+  }
   closeBarModal();
   renderGantt();
   debouncedSave();
@@ -2105,10 +2148,10 @@ let _dragged = false; // distinguish click vs drag
 
 function onBarTdClick(e, td) {
   if (_dragged) { _dragged = false; return; }
-  if (e.target.closest('.g-bar')) return; // bar click handled separately
+  if (e.target.closest('.g-bar')) return;
   const bKey  = td.dataset.bkey;
   const title = td.dataset.title;
-  openBarModal(bKey, title);
+  openBarModal(bKey, title, null); // null = 新規
 }
 
 document.addEventListener('mousedown', e => {
@@ -2119,6 +2162,7 @@ document.addEventListener('mousedown', e => {
 
   const handle = e.target.dataset.drag;
   const bKey        = bar.dataset.bkey;
+  const barId       = bar.dataset.barId;
   const colW        = +bar.dataset.colW;
   const ganttStart  = parseDate(bar.dataset.ganttStart);
   const totalCols   = +bar.dataset.totalCols;
@@ -2129,7 +2173,7 @@ document.addEventListener('mousedown', e => {
 
   _drag = {
     type: handle || 'move',
-    bar, bKey, colW, ganttStart, totalCols,
+    bar, bKey, barId, colW, ganttStart, totalCols,
     startX: e.clientX,
     origStartOff, origEndOff,
     color: bar.style.background,
@@ -2201,27 +2245,37 @@ document.addEventListener('mouseup', e => {
     newEndOff = Math.max(origStartOff, Math.min(totalCols - 1, origEndOff + dCols));
   }
 
-  ganttBars[bKey] = {
-    start: fmtDate(addDays(ganttStart, newStartOff)),
-    end:   fmtDate(addDays(ganttStart, newEndOff)),
-  };
+  // 配列対応でbar更新
+  const { barId } = _drag;
+  if (!Array.isArray(ganttBars[bKey])) {
+    ganttBars[bKey] = ganttBars[bKey] ? [ganttBars[bKey]] : [];
+  }
+  const bidx = ganttBars[bKey].findIndex(b => b.id === barId);
+  if (bidx >= 0) {
+    ganttBars[bKey][bidx] = {
+      id: barId,
+      start: fmtDate(addDays(ganttStart, newStartOff)),
+      end:   fmtDate(addDays(ganttStart, newEndOff)),
+    };
+  }
 
   bar.style.opacity   = '1';
   bar.style.transition = '';
   document.body.style.cursor     = '';
   document.body.style.userSelect = '';
   hideTooltip();
+  const wasDragged = _dragged;
   _drag = null;
+  _dragged = false;
 
-  // Re-render only if click didn't happen (avoid flicker on pure click)
-  if (_dragged) { renderGantt(); debouncedSave(); }
+  if (wasDragged) { renderGantt(); debouncedSave(); }
 });
 
-// bar click → open modal (only if not dragged)
+// bar click → open modal
 document.addEventListener('click', e => {
   const bar = e.target.closest('.g-bar');
-  if (!bar || _dragged) return;
-  openBarModal(bar.dataset.bkey, `${bar.dataset.scene} ${bar.dataset.section}`);
+  if (!bar) return;
+  openBarModal(bar.dataset.bkey, bar.dataset.section, bar.dataset.barId);
 }, true);
 
 /* ── TOOLTIP ── */
